@@ -1,0 +1,14 @@
+# Byte-compiled / optimized / DLL files
+_pycache_/
+__pychache__/
+*.py[cod]
+*$py.class
+
+.idea
+input_data/
+Experiments
+DP/Trans_matxs/
+DP/__pycache__/
+QL/__pycache__/
+Stationary_state_space/
+*.png
