@@ -5,8 +5,9 @@ __pychache__/
 *$py.class
 
 .idea
-input_data/
-Experiments
+Input_data_files/
+prel_Tests/1
+Experiments/
 DP/Trans_matxs/
 DP/__pycache__/
 QL/__pycache__/

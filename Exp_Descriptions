@@ -1,0 +1,9 @@
+Exp1:
+	In Q value function, checking to see if the consecutive states in the state trajectory were in the same cell. Updating Q values only if they weren't. This is wrong.
+	
+		if (s1[1],s1[2])!=(s2[1],s2[2]):
+
+	*the abovee arguement is not valid for learnign from scratch, id. dt_size=0, since this function is never used in the first place*
+
+Exp_2:
+	Removed the if statement in Exp_1. Hoping for better results
