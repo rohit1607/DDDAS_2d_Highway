@@ -74,7 +74,6 @@ def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, nu
         coord_traj.reverse()
 
         #build buffer
-
         print("check warning: ", k)
         # print("s1, p1, p2, Vxt, Vyt")
         for i in range(len(state_traj)-1):
@@ -90,7 +89,6 @@ def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, nu
             vx = Vxt[m, n]
             vy = Vyt[m, n]
             # print(s1,p1,p2, vx, vy)
-            a1 = Calculate_action(s1,p1,p2, vx, vy, grid)
             r1 = grid.move_exact(a1, vx, vy)
             exp_buffer_kth_traj.append([s1, a1, r1, s2])
 
@@ -98,6 +96,8 @@ def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, nu
         exp_buffer_all_trajs.append(exp_buffer_kth_traj)
 
     return exp_buffer_all_trajs
+
+
 """
 ## original . doesnt do away with copies. paths input not pruned and padded.
 # Calculate theta (outgoing angle) between last point in 1st cell and first point in next cell
@@ -152,6 +152,17 @@ def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, nu
 """
 
 def learn_Q_from_exp_buffer(grid, exp_buffer, Q, N, ALPHA, method='reverse_order', num_passes =1):
+    """
+    Learns Q values after building experience buffer. Contains 2 types of methods- 1.reverse pass through buffer  2.random pass through buffer
+    :param grid:
+    :param exp_buffer:
+    :param Q:
+    :param N:
+    :param ALPHA:
+    :param method:
+    :param num_passes:
+    :return:
+    """
 
     def Q_update(Q, N, max_delQ, sars):
         s1, a1, r1, s2 = sars
@@ -355,59 +366,6 @@ def Learn_policy_from_data(paths, g, Q, N, Vx_rzns, Vy_rzns, num_of_paths=10, nu
 
     return Q, policy, max_Qdel_list
 
-
-# #Read data from files
-# grid_mat = scipy.io.loadmat('param.mat')
-# path_mat = scipy.io.loadmat('pathStore.mat')
-#
-# XP =grid_mat['XP']
-# YP = grid_mat['YP']
-#
-# Vx_rzns = np.load('Velx_5K_rlzns.npy')
-# Vy_rzns = np.load('Vely_5K_rlzns.npy')
-# print("Vx_rzns.shape", Vx_rzns.shape)
-#
-# #Set up Grid
-# xs = XP[1,:]
-# ys_temp = YP[:,1]
-# ys= np.flip(ys_temp)
-# dt = 1
-# F = 1
-# # g = timeOpt_grid(xs, ys, dt, (50, 20), (50, 80))
- # """ Be careful ! My Code's state indices are different from path data """
-# g = timeOpt_grid(xs, ys, dt, F, (78, 48), (20, 50), num_actions=num_actions)
-#
-# init_Q=-10000
-# Q, N = initialise_Q_N(g, init_Q, 1)
-# Q, policy = Learn_policy_from_data(path_mat, g, Q, N, Vx_rzns, Vy_rzns, num_of_paths=1000)
-# print("Learnt policy from data")
-# # print("test updated q vales")
-# # for s in Q.keys():
-# #     # print(s)
-# #     for a in Q[s].keys():
-# #         # print(a)
-# #         if Q[s][a] != init_Q:
-# #             print(s,a,Q[s][a])
-# #
-# stream_speed = 0.2
-# QIters = 0
-# label_data = [ F, stream_speed, ALPHA, init_Q, QIters ]
-# X, Y = my_meshgrid(xs, ys)
-# plot_learned_policy(g, Q, policy, init_Q, label_data)
-#
-#
-# traje, return_value = plot_exact_trajectory(g, policy, X, Y,Vx_rzns[0,:,:], Vy_rzns[0,:,:], fname='QL_Highway', lastfig=True)
-#
-# print('Qvalue learning finished, Policy computed')
-#
-# QIters = 500000
-# Q, policy = Q_learning_Iters(Q, N, g, policy, Vx_rzns, Vy_rzns, alpha = ALPHA, QIters=QIters, post_train_size = 5000, eps_0= 0.5)
-# plot_max_Qvalues(Q,policy, XP,YP)
-#
-# plot_learned_policy(g, Q, policy, init_Q, label_data, Iters_after_update=QIters)
-# # Q, N, policy, delta_list = Monte_Carlo_Run(Q, N, g, policy, Vx_rzns, Vy_rzns, mcIters=10000, stepsize=1000, train_size = 1000, eps_0=0.1)
-# # plot_learned_policy(g, X, Y, Q, policy, init_Q)
-#
 
 
 

@@ -112,6 +112,6 @@ method = 'reverse_order'
 num_passes = 50
 QL_params = [Training_traj_size_list, ALPHA_list, esp0_list, QL_Iters, init_Q, with_guidance, method, num_passes]
 
-# run_Experiment(QL = QL_params)
-run_Experiment(DP = [model_file])
+run_Experiment(QL = QL_params)
+# run_Experiment(DP = [model_file])
 # run_Experiment(DP = [model_file], QL = QL_params)

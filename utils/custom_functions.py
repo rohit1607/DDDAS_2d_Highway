@@ -342,81 +342,44 @@ def calc_net_velocity_angle(vx,vy,a):
     F, theta = a
     return get_angle_in_0_2pi( math.atan2(F*math.sin(theta) + vy, F*math.cos(theta) + vx) )
 
+def calc_net_velocity(vx, vy, a):
+    F, theta = a
+    vy_net = F*math.sin(theta) + vy
+    vx_net = F*math.cos(theta) + vx
+    mag_v = (vx_net**2 + vy_net**2)**.5
+    ang_v = get_angle_in_0_2pi(math.atan2(vy_net, vx_net))
+    return (mag_v, ang_v)
 
-def calc_action_angle(traj_theta, vx, vy, F,g):
-    def solve_eqn_1(z):
-        b = math.tan(traj_theta)
-        func_val = (b * F * math.cos(z)) - (F * math.sin(z)) - vy + (b * vx)
-        return func_val
 
-    def solve_eqn_2(z):
-        b = math.tan(traj_theta)
-        func_val = (b * F * math.cos(z)) - (F * math.sin(z)) - vy + (b * vx)
-        return func_val
+def action_angle(traj_theta, actions, vx, vy, F):
+    print()
+    diff_list = []
+    blocked_actions = []
+    angle_list = []
+    for idx in range(len(actions)):
+        angle_list.append(actions[idx][1])
+        (net_v_mag, net_v_angle) = calc_net_velocity(vx, vy, actions[idx])
+        if net_v_mag < 0.001:
+            blocked_actions.append(idx)
+        diff_list.append(np.abs(traj_theta - net_v_angle))
+    sorted_ids = np.argsort(diff_list)
 
-    zGuess = traj_theta
-    z = fsolve(solve_eqn_1, zGuess)
-    angle = z[0]
-    #if angle is negative, make it positive
-    while angle<0:
-        angle += 2*Pi
-    #if angle is grater than 2Pi, bring it beween [0, 2Pi]
-    angle = z[0] % (2 * Pi)
-
-    # print("in calc_action_angle : ",angle)
-    if np.abs(F*math.cos(angle) + vx) < 0.001:
-        print("denominator: ", np.abs(F*math.cos(angle) + vx))
-        diff_list= []
-        for a in g.actions:
-            net_angle = calc_net_velocity_angle(vx,vy,a)
-            diff_list.append(np.abs(traj_theta -net_angle))
-        idx = np.argmin(np.array(diff_list))
-        angle = g.actions[idx][1]
-
-    return angle
-
+    min_id = None
+    for idx in sorted_ids:
+        if idx in blocked_actions:
+            pass
+        else:
+            min_id = idx
+            print("min_id =", min_id)
+            break
+    action = actions[min_id]
+    return action
 
 def Calculate_action(state_1,p1,p2, vx, vy, g):
-    """Handles only single speed"""
-    # traj_theta =  math.atan2(p2[2] - p1[2], p2[1] - p1[1])
-    # t, m, n = state_1
     traj_theta = get_angle_in_0_2pi(math.atan2(p2[1] - p1[1], p2[0] - p1[0]))
-
-    """Will have to be changed (include time) for the general problem!!!"""
     F = g.actions[0][0]
-    ac_theta = calc_action_angle(traj_theta, vx, vy, F, g)
-
-    #angles discretised at
-    num_actions = len(g.actions)
-    d_theta = 2*Pi/num_actions
-    l = int(ac_theta//d_theta)
-    a1 =g.actions[l]
-    a2 = g.actions[(l+1)%num_actions]
-    a1_angle = a1[1]
-    a2_angle = a2[1]
-
-    # if a2_angle == 2*Pi:
-    #     a2_angle=0
-    # if flag==True:
-    #     print("angles", a1_angle,a2_angle)
-
-    del_a1_angle = np.abs(ac_theta - a1_angle)
-    del_a2_angle = np.abs(ac_theta - a2_angle)
-    if del_a1_angle > Pi:
-        del_a1_angle -= Pi
-    if del_a2_angle > Pi:
-        del_a2_angle -= Pi
-
-    if del_a1_angle<=del_a2_angle:
-        best_action = a1
-    else:
-        best_action = a2
-
-    if state_1[0] == 40 and state_1[1] >= 58 and state_1[1] <= 70:
-        if ac_theta > Pi:
-            print("Check: ",state_1, p1, p2, traj_theta, ac_theta, a1, a2, del_a1_angle, del_a2_angle)
-
-    return best_action
+    action = action_angle(traj_theta, g.actions, vx, vy, F)
+    return action
 
 
 def initialise_guided_Q_N(g, init_Qval, guiding_Qval,  init_Nval):
