@@ -17,32 +17,67 @@ def initialise_dict(g):
     return transition_dict
 
 
-#populate transition_dict with counts
-def compute_transition_probability_and_rewards(transition_dict, g, num_rzns, Vx_rzns, Vy_rzns):
-    s_count = 0
-    for s in state_list:
-        s_count += 1
-        i0, j0 = s
-        if s_count%100 == 0:
-            print("s_count: ", s_count)
-        for a in g.actions:
-            for rzn in range(num_rzns):
-                g.set_state(s)
-                r = g.move_exact(a, Vx_rzns[rzn, i0, j0], Vy_rzns[rzn, i0, j0])
-                s_new = g.current_state()
-                if transition_dict[s][a].get(s_new):
-                    transition_dict[s][a][s_new][0] += 1
-                    transition_dict[s][a][s_new][1] += (1/transition_dict[s][a][s_new][0])*(r - transition_dict[s][a][s_new][1])
-                else:
-                    transition_dict[s][a][s_new] = [1, r]
+def compute_transition_probability_and_rewards(transition_dict, g, num_rzns, Vx_rzns, Vy_rzns, method='const_rzn'):
+    """
+    IMPORTANT: There are two methods of constructing the transition function.
+    :param transition_dict:
+    :param g:
+    :param num_rzns:
+    :param Vx_rzns:
+    :param Vy_rzns:
+    :param method: 1. 'const_rzn' - if the agent is in the velocity field of 1 rzn, then after doing an action,
+                        it remains in the same realisation.
+                   2. 'var_rzn' - if the agent is in the velocity field of 1 rzn, then after doing an action,
+                        it has probability of experiencing velocity field of another realisation.
+    :return:
+    """
 
-    #convert counts to probabilites
-    for s in state_list:
-        for a in g.actions:
-            for s_new in transition_dict[s][a]:
-                transition_dict[s][a][s_new][0] = transition_dict[s][a][s_new][0]/num_rzns
+    if method == 'const_rzn':
+        for rzn in range(num_rzns):
+            print("rzn: ", rzn)
+            for pos in pos_list:
+                i, j = pos
+                vx = Vx_rzns[rzn, i, j]
+                vy = Vy_rzns[rzn, i, j]
+                dvx = g.discretize(vx, g.vxs)
+                dvy = g.discretize(vy, g.vys)
+                s = (i, j, dvx, dvy)
+                # print()
+                # print("----- s = ", s, "----")
+                for a in g.actions:
+                    # print("action ", a)
+                    g.set_state(s)
+                    r = g.move_exact(a)
+                    i2, j2 = g.current_pos()
+                    if g.if_edge_state((i2,j2)):#agent may end up in edge state where the velocity it reads mya be NaN
+                        vx2 = 0
+                        vy2 = 0
+                    else:
+                        vx2 = Vx_rzns[rzn, i2, j2]
+                        vy2 = Vy_rzns[rzn, i2, j2]
+                    # print("test in compute_trans:i2, j2, vx2, vy2 ", i2, j2, vx2, vy2)
+                    dvx2 = g.discretize(vx2, g.vxs)
+                    dvy2 = g.discretize(vy2, g.vys)
+                    s_new = (i2, j2, dvx2, dvy2)
+                    if transition_dict[s][a].get(s_new):
+                        transition_dict[s][a][s_new][0] += 1
+                        transition_dict[s][a][s_new][1] += (1 / transition_dict[s][a][s_new][0]) * (r - transition_dict[s][a][s_new][1])
+                    else:
+                        transition_dict[s][a][s_new] = [1, r]
 
-    return transition_dict
+        # convert counts to probabilites
+        for s in state_list:
+            for a in g.actions:
+                for s_new in transition_dict[s][a]:
+                    transition_dict[s][a][s_new][0] = transition_dict[s][a][s_new][0] / num_rzns
+
+
+    elif method == 'var_rzn':
+
+        pass
+
+        return transition_dict
+
 
 
 def write_files(transition_dict, filename, data):
@@ -81,6 +116,7 @@ def Build_Model(filename = 'Transition_dict', n_actions = 1, nt = None, dt =None
     global state_list
     global base_path
     global save_path
+    global pos_list
 
     start_time = time.time()
 
@@ -97,6 +133,7 @@ def Build_Model(filename = 'Transition_dict', n_actions = 1, nt = None, dt =None
 
     #build probability transition dictionary
     state_list = g.ac_state_space()
+    pos_list = g.ac_state_space(only_pos=True)
     init_transition_dict = initialise_dict(g)
     transition_dict = compute_transition_probability_and_rewards(init_transition_dict, g, num_rzns, Vx_rzns, Vy_rzns)
     build_time = time.time() - start_time
@@ -112,6 +149,6 @@ def Build_Model(filename = 'Transition_dict', n_actions = 1, nt = None, dt =None
     print("Total TIme = ", total_time/60, "mins")
 
 
-Build_Model(filename='Model_7_',n_actions=16)
+Build_Model(filename='4st_Model_1', n_actions=16)
 # Build_Model(filename='Model_1_',n_actions=8)
 # Build_Model(filename='Model_1_',n_actions=16)

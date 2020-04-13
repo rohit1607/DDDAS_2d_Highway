@@ -6,7 +6,7 @@ import math
 Pi = math.pi
 
 class Grid:
-    def __init__(self, xs, ys, dt, nt, start, end):
+    def __init__(self, xs, ys, vxs, vys, dt, nt, start, end):
         self.nj = len(xs)
         self.ni = len(ys)
         self.nt = nt
@@ -17,16 +17,25 @@ class Grid:
         self.dt = dt
         # print("diffs=", self.dj, self.di)
 
+        # state discretizations
         self.xs = xs
         self.ys = ys
+        self.vxs = vxs
+        self.vys = vys
 
+        # state variables
         self.x = xs[start[1]]
         self.y = ys[self.ni - 1 - start[0]]
+        self.vx = None
+        self.vy = None
 
-        # i, j , start and end store indices!!
+        # i, j , start and end store indices!! dvx, dvy are discrete versions of vx and vy
+        # IMPORTANT: while i and j are indices; dvx and dvy are not. they are values from the list vxs and vys
         self.t = 0
         self.i = int(start[0])
         self.j = int(start[1])
+        self.dvx = None
+        self.dvy = None
 
         self.endpos = end
         self.startpos = start
@@ -43,15 +52,39 @@ class Grid:
         self.actions = Actions
         # self.rewards= Rewards
 
+    def discretize(self, v, vs):
+        """
+        Works only if elements of vs are spaced at regular intervals
+        :param v: vx or vy from a cell from a particular realisation of the velocity field
+        :param vs: list of vxs or vys- these are discrete possibilites of vxs or vys
+        :return: closest element of vx/vy to v
+        """
+        if v > vs[-1]:
+            return vs[-1]
+        if v < vs[0]:
+            return vs[0]
+
+        del_vs = vs[1] - vs[0]
+        # print("in discretize(): v, vs[0], del_vs", v, vs[0], del_vs)
+        id = int( (v-vs[0])//del_vs )
+        rem = v % del_vs
+        if rem > del_vs/2:
+            id += 1
+
+        return vs[id]
 
     # explicitly set state. state is a tuple of indices(m,n,p)
     def set_state(self, state, xcoord=None, ycoord=None):
         # self.t = state[0]
         self.i = state[0]
         self.j = state[1]
-  
+        self.dvx = state[2]
+        self.dvy = state[3]
+
         self.x = self.xs[self.j]
         self.y = self.ys[self.ni - 1 - self.i]
+        self.vx = self.dvx
+        self.vy = self.dvy
 
         if xcoord != None and ycoord != None:
             self.x = xcoord
@@ -59,7 +92,7 @@ class Grid:
 
 
     def current_state(self):
-        return (int(self.i), int(self.j))
+        return (int(self.i), int(self.j), self.dvx, self.dvy)
 
     def current_pos(self):
         return (int(self.i), int(self.j))
@@ -70,15 +103,21 @@ class Grid:
         # return self.actions[state]==None
         return (self.current_pos() == self.endpos)
 
-    def move_exact(self, action, Vx, Vy):
+    def move_exact(self, action):
+        """
+        Moves agent based on current state and performed action. Collects relevant reward
+        :param action:
+        :return: immediate reward
+        *variant in obsolete.py:  move_exact_noreward()
+        """
         r = 0
         if not self.is_terminal() and self.if_within_actionable_time():
             thrust, angle = action
             s0 = self.current_state()
             # print("check: thrust, angle ", thrust, angle)
             # print("self.x, self.y", self.x,self.y)
-            vnetx = (thrust * math.cos(angle)) + (Vx)
-            vnety = (thrust * math.sin(angle)) + (Vy)
+            vnetx = (thrust * math.cos(angle)) + (self.dvx)
+            vnety = (thrust * math.sin(angle)) + (self.dvy)
             xnew = self.x + (vnetx * self.dt)
             ynew = self.y + (vnety * self.dt)
             # print("xnew, ynew",xnew,ynew)
@@ -124,6 +163,12 @@ class Grid:
                 if self.if_edge_state((self.i, self.j)):
                     r += self.r_outbound
 
+            #---- IMPORTANT------
+            # We dont know what velocity value it will take on. vx,vy agent will observe in the next position
+            # dvx and dvy will be assigned specifically when the agent reaches the next postion
+            self.dvx = None
+            self.dvy = None
+
             s_new = self.current_state()
             r += self.r_otherwise(self.dt, self.xs, self.ys, s0, s_new, vnetx, vnety, action)
 
@@ -134,14 +179,20 @@ class Grid:
 
 
     # !! time to mentioned by index !!
-    def ac_state_space(self, time=None):
+    def ac_state_space(self, only_pos = False, time=None):
         a=set()
-
-        for i in range(self.ni):
-            for j in range(self.nj):
-                if ((i,j)!=self.endpos and not self.if_edge_state((i,j)) ):# does not include states with pos as endpos
-                    a.add((i,j))
-
+        if only_pos == False:
+            for i in range(self.ni):
+                for j in range(self.nj):
+                    if ((i,j)!=self.endpos and not self.if_edge_state((i,j)) ):# does not include states with pos as endpos
+                        for dvx in self.vxs:
+                            for dvy in self.vys:
+                                a.add((i, j, dvx, dvy))
+        else:
+            for i in range(self.ni):
+                for j in range(self.nj):
+                    if ((i,j)!=self.endpos and not self.if_edge_state((i,j)) ):# does not include states with pos as endpos
+                        a.add((i, j))
         return sorted(a)
 
 
@@ -149,17 +200,10 @@ class Grid:
         a = set()
         for i in range(self.ni):
             for j in range(self.nj):
-                a.add((i,j))
-
+                for dvx in self.vxs:
+                    for dvy in self.vys:
+                        a.add((i,j,dvx,dvy))
         return sorted(a)
-    #
-    # def edge_states(self):
-    #     edge_states = []
-    #     for s in self.state_space():
-    #         if (s[0] == 0) or (s[0] == self.ni - 1) or (s[1] ==0) or (s[1] == self.nj - 1):
-    #             edge_states.append(s)
-    #
-    #     return edge_states
 
 
     def if_within_time(self):
@@ -190,80 +234,16 @@ class Grid:
         else:
             return False
 
-    #
-    # def move_exact_noreward(self, action, Vx, Vy):
-    #     # if math.isnan(Vx):
-    #     #     Vx = 0
-    #     # if math.isnan(Vy):
-    #     #     Vy = 0
-    #
-    #     if self.is_terminal() == False and self.if_within_actionable_time():
-    #         thrust, angle = action
-    #         # print("check: thrust, angle ", thrust, angle)
-    #         # print("self.x, self.y", self.x,self.y)
-    #         vnetx = (thrust * math.cos(angle)) + (Vx)
-    #         vnety = (thrust * math.sin(angle)) + (Vy)
-    #         xnew = self.x + (vnetx * self.dt)
-    #         ynew = self.y + (vnety * self.dt)
-    #         # print("xnew, ynew",xnew,ynew)
-    #
-    #         if xnew > self.xs[-1]:
-    #             xnew = self.xs[-1]
-    #         elif xnew < self.xs[0]:
-    #             xnew = self.xs[0]
-    #         if ynew > self.ys[-1]:
-    #             ynew = self.ys[-1]
-    #         elif ynew < self.ys[0]:
-    #             ynew = self.ys[0]
-    #         # print("xnew, ynew after boundingbox", xnew, ynew)
-    #         # rounding to prevent invalid keys
-    #
-    #         self.x = xnew
-    #         self.y = ynew
-    #
-    #         remx = (xnew - self.xs[0]) % self.dj
-    #         remy = -(ynew - self.ys[-1]) % self.di
-    #         xind = (xnew - self.xs[0]) // self.dj
-    #         yind = -(ynew - self.ys[-1]) // self.di
-    #
-    #         # print("rex,remy,xind,yind", remx,remy,xind,yind)
-    #
-    #         if remx >= 0.5 * self.dj and remy >= 0.5 * self.di:
-    #             xind += 1
-    #             yind += 1
-    #         elif remx >= 0.5 * self.dj and remy < 0.5 * self.di:
-    #             xind += 1
-    #         elif remx < 0.5 * self.dj and remy >= 0.5 * self.di:
-    #             yind += 1
-    #         # print("rex,remy,xind,yind after upate", remx, remy, xind, yind)
-    #         # print("after update, (i,j)", (yind,xind))
-    #         if not (math.isnan(xind) or math.isnan(yind)):
-    #             self.i = int(yind)
-    #             self.j = int(xind)
-    #
-    #     return
-    #
-    #
-    # def R(self, s, snew):
-    #
-    #     if snew == self.endpos:
-    #         return +10
-    #
-    #     elif (snew in self.edge_states):
-    #         return -100
-    #
-    #     else:
-    #         return -1
-
 """Class ends here"""
+
 
 
 def intersection(lst1, lst2):
     lst3 = [value for value in lst1 if value in lst2]
     return lst3
 
-def timeOpt_grid(xs, ys, dt, nt, F, startpos, endpos, num_actions=36):
-    g = Grid(xs, ys, dt, nt, startpos, endpos)
+def timeOpt_grid(xs, ys, vxs, vys, dt, nt, F, startpos, endpos, num_actions=36):
+    g = Grid(xs, ys, vxs, vys, dt, nt, startpos, endpos)
 
     # define actions and rewards
     Pi = math.pi

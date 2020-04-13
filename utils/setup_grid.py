@@ -7,15 +7,30 @@ from os import getcwd
 from os.path import join
 import math
 
+
 def get_filler_coords(traj, start_pos):
+    """
+    generates points on a line joining start position and the first point on a given path
+    :param traj: 1 path
+    :param start_pos: start pos of problem
+    :return: list of (x,y) coords
+    """
     x0, y0 = start_pos
     x, y = traj[0]
+    #num_points: no. of filler points is based on trajectory's waypoint density.
     num_points = int(np.linalg.norm(traj[0] - np.array([x0, y0]), 2) // np.linalg.norm(traj[0] - traj[1], 2))
     filler_xy = np.linspace((x0, y0), (x, y), int(num_points), endpoint=False)
     return filler_xy
 
 
 def prune_and_pad_paths(path_ndarray, start_xy, end_xy):
+    """
+    prunes out waypoints that go past endpos. pads way points between startpos and trajectories' start
+    :param path_ndarray: list/ndarray of paths
+    :param start_xy: starpos
+    :param end_xy: endpos
+    :return: pruned and padded path_ndarray
+    """
     xf, yf = end_xy
     _, num_rzns = path_ndarray.shape
     for n in range(num_rzns):
@@ -38,7 +53,20 @@ def prune_and_pad_paths(path_ndarray, start_xy, end_xy):
 
 #Tweaked
 def setup_grid(num_actions =16, nt = 100, dt =1, F =1, startpos = (79, 49), endpos = (20, 50), Test_grid= False):
-
+    """
+    sets up discretized grid based on input data.
+    prunes and pads paths (preprocesing)
+    loads velocity data in line with discritized grid. velocities are interpolated as a pre-processing step.
+    Contains two grid setups: 1. Highway problem    2. small self generated test problem
+    :param num_actions:
+    :param nt:
+    :param dt:
+    :param F:
+    :param startpos:
+    :param endpos:
+    :param Test_grid:
+    :return:
+    """
     if Test_grid == False:
         #Read data from files
         grid_mat = scipy.io.loadmat(join(ROOT_DIR, 'Input_data_files/param.mat'))
@@ -58,12 +86,16 @@ def setup_grid(num_actions =16, nt = 100, dt =1, F =1, startpos = (79, 49), endp
         ys_temp = YP[:,1]
         ys = np.flip(ys_temp)
         X, Y = my_meshgrid(xs, ys)
+        vxs = [0.0, 0.5, 1]
+        vys = [0.0, 0.5, 1]
 
     else:
         num_rzns = 50
         size = 12
         xs = np.arange(size)
         ys = np.arange(size)
+        vxs = [0.0, 0.5, 1]
+        vys = [0.0, 0.5, 1]
         X, Y = my_meshgrid(xs, ys)
         Vx_rzns = np.zeros((num_rzns, size, size))
         Vy_rzns = np.zeros((num_rzns, size, size))
@@ -81,8 +113,7 @@ def setup_grid(num_actions =16, nt = 100, dt =1, F =1, startpos = (79, 49), endp
         param_str = ['num_actions', 'nt', 'dt', 'F', 'startpos', 'endpos']
         params = [num_actions, nt, dt, F, startpos, endpos]
 
-
-    g = timeOpt_grid(xs, ys, dt, nt, F, startpos, endpos, num_actions=num_actions)
+    g = timeOpt_grid(xs, ys, vxs, vys, dt, nt, F, startpos, endpos, num_actions=num_actions)
 
     print("Grid Setup Complete !")
     # CHANGE RUNNER FILE TO GET PARAMS(9TH ARG) IF YOU CHANGE ORDER OF RETURNS HERE

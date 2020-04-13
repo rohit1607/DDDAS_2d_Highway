@@ -6,6 +6,7 @@ from _collections import OrderedDict
 
 SAMPLING_Interval = Sampling_interval
 
+
 # Helper func to compute cell state of pt in trajectory and add it to dic
 def compute_cell(grid, s):
     remx = (s[0] - grid.xs[0]) % grid.dj
@@ -34,6 +35,18 @@ def within_same_spatial_cell(grid , point1, point2):
         return 0
 
 def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, num_of_paths, num_actions ):
+    """
+    builds experince buffer from trajectory data.
+    :param grid:
+    :param Vx_rzns:
+    :param Vy_rzns:
+    :param paths:
+    :param sampling_interval:
+    :param num_of_paths:
+    :param num_actions:
+    :return:
+    * variant in obsolete.py: same name. - version without prune and pad operations
+    """
     exp_buffer_all_trajs = []
     for k in range(num_of_paths):
         exp_buffer_kth_traj = []
@@ -89,6 +102,7 @@ def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, nu
             vx = Vxt[m, n]
             vy = Vyt[m, n]
             # print(s1,p1,p2, vx, vy)
+            a1 = Calculate_action(s1,p1,p2, vx, vy, grid)
             r1 = grid.move_exact(a1, vx, vy)
             exp_buffer_kth_traj.append([s1, a1, r1, s2])
 
@@ -98,58 +112,6 @@ def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, nu
     return exp_buffer_all_trajs
 
 
-"""
-## original . doesnt do away with copies. paths input not pruned and padded.
-# Calculate theta (outgoing angle) between last point in 1st cell and first point in next cell
-def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, num_of_paths, num_actions ):
-    exp_buffer_all_trajs = []
-    for k in range(num_of_paths):
-        exp_buffer_kth_traj = []
-        Vxt = Vx_rzns[k, :, :]
-        Vyt = Vy_rzns[k, :, :]
-        trajectory = paths[0, k]
-        state_traj = []
-        coord_traj = []
-
-        #build sub sampled trajectory and reverse it
-        for j in range(0, len(trajectory) - 1, sampling_interval):  # the len '-1' is to avoid reading NaN at the end of path data
-            s_i, s_j = compute_cell(grid, trajectory[j])
-
-            # state_traj.append((s_t, s_i, s_j))
-            # coord_traj.append((grid.ts[s_t],trajectory[j][0], trajectory[j][1]))
-            state_traj.append((s_i, s_j))
-            coord_traj.append((trajectory[j][0], trajectory[j][1]))
-        state_traj.reverse()
-        coord_traj.reverse()
-
-        # Append first state to the sub sampled trajectory
-        m, n = grid.start_state
-        x0 = grid.xs[n]
-        y0 = grid.ys[grid.ni - 1 - m]
-        state_traj.append(grid.start_state)
-        # coord_traj.append((grid.ts[p],x0,y0))
-        coord_traj.append((x0, y0))
-
-        #build buffer
-        for i in range(len(state_traj)-1):
-            s1=state_traj[i+1]
-            s2=state_traj[i]
-            # t ,m,n=s1
-            m, n = s1
-            p1=coord_traj[i+1]
-            p2=coord_traj[i]
-       
-            # if (s1[1],s1[2])!=(s2[1],s2[2]):
-            #vx=Vxt[t,i,j]
-            a1 = Calculate_action(s1,p1,p2, Vxt, Vyt, num_actions)
-            r1 = grid.move_exact(a1, Vxt[m, n], Vyt[m, n])
-            exp_buffer_kth_traj.append([s1, a1, r1, s2])
-
-        #append kth-traj-list to master list
-        exp_buffer_all_trajs.append(exp_buffer_kth_traj)
-
-    return exp_buffer_all_trajs
-"""
 
 def learn_Q_from_exp_buffer(grid, exp_buffer, Q, N, ALPHA, method='reverse_order', num_passes =1):
     """

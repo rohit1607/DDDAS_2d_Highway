@@ -8,6 +8,7 @@ action_state_space = []
 """
 __________________________________FUNCTIONS_______________________________________________________--
 """
+
 # initialise value functions and policy
 def initialise_policy_and_V(g):
     policy = {}
@@ -15,8 +16,8 @@ def initialise_policy_and_V(g):
     for s in g.state_space():
         V[s] = 0
         policy[s] =(0,0)
-
     return policy, V
+
 
 def value_iteration_update(g, V, Trans_prob):
     delV = -10
@@ -44,6 +45,7 @@ def value_iteration_update(g, V, Trans_prob):
 
     return V, delV, state_flag
 
+
 def compute_Policy(g, policy, Trans_prob, V):
     for s in action_state_space:
         g.set_state(s)
@@ -63,9 +65,11 @@ def compute_Policy(g, policy, Trans_prob, V):
 
     return policy
 
+
 def pickle_V(V):
     with open('ValueFunc.p', 'wb') as fp:
         pickle.dump(V, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
 
 def write_list_to_file(list, file):
     outputfile = open(file, 'w+')
