@@ -89,6 +89,7 @@ def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, nu
             vx = Vxt[m, n]
             vy = Vyt[m, n]
             # print(s1,p1,p2, vx, vy)
+            a1 = Calculate_action(s1,p1,p2, vx, vy, grid)
             r1 = grid.move_exact(a1, vx, vy)
             exp_buffer_kth_traj.append([s1, a1, r1, s2])
 

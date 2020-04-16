@@ -7,6 +7,7 @@ from os import getcwd
 from os.path import join
 import math
 
+
 def get_filler_coords(traj, start_pos):
     x0, y0 = start_pos
     x, y = traj[0]

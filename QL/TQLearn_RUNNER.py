@@ -1,7 +1,7 @@
 from QL.Build_Q_from_Trajs import Learn_policy_from_data
 from utils.plot_functions import plot_max_delQs, plot_exact_trajectory_set, plot_max_Qvalues, plot_learned_policy
 from QL.Q_Learning import Q_learning_Iters
-from utils.custom_functions import initialise_policy, initialise_Q_N, initialise_guided_Q_N, writePolicytoFile, initialise_policy_from_initQ, createFolder
+from utils.custom_functions import initialise_policy, initialise_Q_N, initialise_guided_Q_N, writePolicytoFile, initialise_policy_from_initQ, createFolder, calc_mean_and_std
 import time
 import math
 import numpy as np
@@ -117,13 +117,21 @@ def run_QL(setup_grid_params, QL_params, QL_path):
                 t_list2, G0_list2, bad_count2 = plot_exact_trajectory_set(g, policy, X, Y, Vx_rzns, Vy_rzns, exp,
                                                             fname=dir_path + 'Trajectories_after_exp')
 
+
+
+
+
                 #Results to be printed
-                avg_time1 = np.mean(t_list1)
-                std_time1 = np.std(t_list1)
-                avg_G01 = np.mean(G0_list1)
-                avg_time2 = np.mean(t_list2)
-                std_time2 = np.std(t_list2)
-                avg_G02 = np.mean(G0_list2)
+                # avg_time1 = np.mean(t_list1)
+                # std_time1 = np.std(t_list1)
+                # avg_G01 = np.mean(G0_list1)
+                # avg_time2 = np.mean(t_list2)
+                # std_time2 = np.std(t_list2)
+                # avg_G02 = np.mean(G0_list2)
+                avg_time1, std_time1, _, _ = calc_mean_and_std(t_list1)
+                avg_G01, _, _, _ = calc_mean_and_std(G0_list1)
+                avg_time2, std_time2, _, _ = calc_mean_and_std(t_list2)
+                avg_G02, _, _, _ = calc_mean_and_std(G0_list2)
 
                 if QL_Iters!=0:
                     bad_count1 = (bad_count1, str(bad_count1*100/dt_size)+'%')

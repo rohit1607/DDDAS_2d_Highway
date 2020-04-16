@@ -370,7 +370,7 @@ def action_angle(traj_theta, actions, vx, vy, F):
             pass
         else:
             min_id = idx
-            print("min_id =", min_id)
+            # print("min_id =", min_id)
             break
     action = actions[min_id]
     return action
@@ -435,6 +435,12 @@ def picklePolicy(policy, filename):
     with open(filename +'.p', 'wb') as fp:
         pickle.dump(policy, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
+def read_pickled_File(filename):
+    with open(filename +'.p', 'rb') as fp:
+        File = pickle.load(fp)
+    return File
+
+
 def createFolder(directory):
     try:
         if not os.path.exists(directory):
@@ -454,6 +460,7 @@ def Map_vector_to_grid(u, node_u):
 
     return U
 
+
 # Interpolation of velocites from their grids to XP,YP grid
 def interpolate_to_XP_grid(XU, YU, U, XP, YP):
     flat_xu = np.ndarray.flatten(XU)
@@ -470,7 +477,49 @@ def append_summary_to_summaryFile(summary_file, summary_data):
        writer.writerows([summary_data])
 
 
+def read_n_rearrange_trajSet(filename):
+    """
+    Rearranges list to be usable in frechet_dist()
+    :param filename: filename of pickled traj_set coordinates obtained from plot_all_traj_set()
+    :return: rearranged traj_set coords
+    """
+    old_trajSet =read_pickled_File(filename)
+    new_traj_list = []
+    print("len(old_trajSet) =", len(old_trajSet))
+
+    for i in range(len(old_trajSet)):
+        print("i= ", i)
+        P = old_trajSet[i]
+        Pnew = []
+        print("len(P[0])= ", len(P[0]))
+        for j in range(len(P[0])):
+            Pnew.append([P[0][j],P[1][j]])
+        new_traj_list.append(Pnew)
+    return new_traj_list
 
 
 
+def calc_mean_and_std(scalar_list):
+    """
+    calulates mean, variance and None count of entries in given list.
+    :param scalar_list: list of scalar and None elements
+    :return: mean, std dev, good_cnt, Nonecount
+    """
 
+    cnt = 0
+    sum_x = 0
+    sum_x_sq = 0
+    num_rzns = len(scalar_list)
+
+    for i in range(num_rzns):
+        if scalar_list[i] != None:
+            cnt += 1
+            sum_x += scalar_list[i]
+            sum_x_sq += scalar_list[i]**2
+
+    mean = sum_x/cnt
+    var = (sum_x_sq/cnt) - (sum_x/cnt)**2
+    std = var**0.5
+    none_cnt = num_rzns - cnt
+
+    return mean, std, cnt, none_cnt

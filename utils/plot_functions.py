@@ -2,9 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 from definition import c_ni, ROOT_DIR
-from utils.custom_functions import createFolder, picklePolicy
+from utils.custom_functions import createFolder, picklePolicy, read_pickled_File
 from os.path import join
 from mpl_toolkits.mplot3d import axes3d, Axes3D
+import matplotlib.colors as colors
+import matplotlib.cm as cmx
 
 
 
@@ -546,7 +548,7 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fnam
             else:
                 break
 
-            if t > g.ni * c_ni:
+            if t > g.ni * c_ni: #if trajectory goes haywire, dont plot it.
                 bad_count+=1
                 dont_plot=True
                 break
@@ -557,9 +559,18 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fnam
             t_list.append(t)
             G_list.append(G)
 
+        #ADDED for trajactory comparison
+        else:
+            traj_list.append(None)
+            t_list.append(None)
+            G_list.append(None)
+
+
     if fname != None:
         plt.savefig(join(fpath,fname), dpi=300)
+        print("*** pickling traj_list ***")
         picklePolicy(traj_list, join(fpath,fname))
+        print("*** pickled ***")
 
     return t_list, G_list, bad_count
 
@@ -612,3 +623,86 @@ def plot_input_trajectory(paths, idx, g, X, Y, vStream_x, vStream_y,
 
     return
 
+
+def plot_paths_colored_by_EAT(plotFile=None, baseFile=None, savePath_fname=None):
+    msize = 15
+    fsize = 3
+
+    #---------------------------- beautify plot ---------------------------
+    # time calculation and state trajectory
+    fig = plt.figure(figsize=(fsize, fsize))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.set_xlim(0, 100)
+    ax.set_ylim(0, 100)
+    # set grid
+
+    minor_ticks = [i for i in range(101) if i % 20 != 0]
+    major_ticks = [i for i in range(0, 120, 20)]
+
+    ax.set_xticks(minor_ticks, minor=True)
+    ax.set_xticks(major_ticks, minor=False)
+    ax.set_yticks(major_ticks, minor=False)
+    ax.set_yticks(minor_ticks, minor=True)
+
+    ax.grid(b=True, which='both', color='#CCCCCC', axis='both', linestyle='-', alpha=0.5)
+    ax.tick_params(axis='both', which='both', labelsize=6)
+
+    ax.set_xlabel('X (Non-Dim)')
+    ax.set_ylabel('Y (Non-Dim)')
+
+    #     st_point= g.start_state
+    #     plt.scatter(g.xs[st_point[1]], g.ys[g.ni - 1 - st_point[0]], marker = 'o', s = msize, color = 'k', zorder = 1e5)
+    #     plt.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], marker = '*', s = msize*2, color ='k', zorder = 1e5)
+    plt.gca().set_aspect('equal', adjustable='box')
+
+
+
+
+    #---------------------------- main plot ---------------------------
+    # read file
+    plot_set = read_pickled_File(plotFile)
+
+    # calculate time
+    time_list = []
+    l = len(plot_set)
+
+    # if baseFile is provided, comparison plot will be made. colorbar will show EAT time differnces.
+    if baseFile != None:
+        base_traj_set = read_pickled_File(baseFile)
+        l_base = len(base_traj_set)
+        # sanity check
+        if l != l_base:
+            print("ERROR: Unfair Comparison. Two lists should have data across same number of realisations")
+            return
+
+        for i in range(l):
+            if plot_set[i] != None and base_traj_set[i] != None:
+                t_plot_set_i = len(plot_set[i][0])
+                t_base_set_i = len(base_traj_set[i][0])
+                time_list.append(t_plot_set_i - t_base_set_i)
+
+    # if baseFile is NOT provided, then the basePlot data will be plotted.
+    else:
+        for i in range(l):
+            if plot_set[i] != None:
+                time_list.append(len(plot_set[i][0]))
+
+    # set colormap
+    jet = cm = plt.get_cmap('jet')
+    cNorm = colors.Normalize(vmin=np.min(time_list), vmax=np.max(time_list))
+    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=jet)
+    scalarMap._A = []
+
+    # plot plot_set
+    for i in range(int(l)):
+        if plot_set[i] != None:
+            colorval = scalarMap.to_rgba(time_list[i])
+            plt.plot(plot_set[i][0], plot_set[i][1], color=colorval, alpha=0.6)
+    plt.colorbar(scalarMap)
+
+    if savePath_fname != None:
+        plt.savefig(savePath_fname, bbox_inches="tight", dpi=300)
+
+    plt.show()
+
+    return time_list
