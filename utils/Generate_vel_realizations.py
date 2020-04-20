@@ -2,12 +2,13 @@ import numpy as np
 import scipy.io
 from utils.custom_functions import Map_vector_to_grid, interpolate_to_XP_grid
 import matplotlib.pyplot as plt
+from definition import ROOT_DIR
 
 
 #Read data from files
-path_mat = scipy.io.loadmat('pathStore.mat')
-grid_mat = scipy.io.loadmat('param.mat')
-vel_mat = scipy.io.loadmat('000000.mat')
+path_mat = scipy.io.loadmat(ROOT_DIR + '/Input_data_files/pathStore.mat')
+grid_mat = scipy.io.loadmat(ROOT_DIR + '/Input_data_files/param.mat')
+vel_mat = scipy.io.loadmat(ROOT_DIR + '/Input_data_files/000000.mat')
 node_u = grid_mat['Nodeu']
 node_v = grid_mat['Nodev']
 XU = grid_mat['XU']

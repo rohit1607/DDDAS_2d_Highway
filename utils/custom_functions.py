@@ -46,13 +46,13 @@ def calculate_reward_const_dt(dt, xs, ys, so, sn, vnet_x, vnet_y, a, degree = Fa
     else:
         ni = len(ys)
 
-        io = so[0]
-        jo = so[1]
+        io = so[1]
+        jo = so[2]
         xo = xs[jo]
         yo = ys[ni - 1 - io]
 
-        inw = sn[0]
-        jnw = sn[1]
+        inw = sn[1]
+        jnw = sn[2]
         xnw = xs[jnw]
         ynw = ys[ni - 1 - inw]
         conv_factor=1
@@ -438,6 +438,7 @@ def picklePolicy(policy, filename):
 def read_pickled_File(filename):
     with open(filename +'.p', 'rb') as fp:
         File = pickle.load(fp)
+    print("READING " + filename + '.p')
     return File
 
 
@@ -517,9 +518,13 @@ def calc_mean_and_std(scalar_list):
             sum_x += scalar_list[i]
             sum_x_sq += scalar_list[i]**2
 
+    if cnt == 0:
+        print("\n $$$$------ ERROR: List contains only Nones --------$$$$ \n")
+
     mean = sum_x/cnt
     var = (sum_x_sq/cnt) - (sum_x/cnt)**2
     std = var**0.5
     none_cnt = num_rzns - cnt
+
 
     return mean, std, cnt, none_cnt

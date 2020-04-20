@@ -165,10 +165,10 @@ def plot_exact_trajectory(g, policy, X, Y, vStream_x, vStream_y, fpath, fname=No
     vtx_list = []
     vty_list = []
 
-    i, j = g.start_state
+    t, i, j = g.start_state
     # print(i,j)
 
-    g.set_state((i, j))
+    g.set_state((t, i, j))
     # print(g.current_state())
     trajectory.append((i, j))
     a = policy[g.current_state()]
@@ -251,7 +251,7 @@ def plot_exact_trajectory(g, policy, X, Y, vStream_x, vStream_y, fpath, fname=No
         # print("current: ",vStream_x[i, j], vStream_y[i, j] )
         r = g.move_exact(a, vStream_x[i, j], vStream_y[i, j])
         G = G + r
-        (i, j) = g.current_state()
+        (t, i, j) = g.current_state()
 
         # print(g.current_state(), (t, x, y), a, vStream_x[t, x, y], vStream_y[t, x, y])
         trajectory.append((i, j))
@@ -313,7 +313,7 @@ def plot_exact_trajectory(g, policy, X, Y, vStream_x, vStream_y, fpath, fname=No
                 plt.savefig(join(fpath, filename))
                 plt.close()
 
-        t+=1
+        # t+=1
     return trajectory, G
 
 
@@ -322,7 +322,7 @@ def plot_learned_policy(g, DP_params = None, QL_params = None,  showfig = False)
     Plots learned policy
     :param g: grid object
     :param DP_params: [policy, filepath]
-    :param QL_params: [policy, Q, init_Q, label_data, filepath]
+    :param QL_params: [policy, Q, init_Q, label_data, filepath]  - details mentioned below
     :param showfig: whether you want to see fig during execution
     :return:
     """
@@ -333,7 +333,7 @@ def plot_learned_policy(g, DP_params = None, QL_params = None,  showfig = False)
     :param init_Q: initial value for Q. Just like Q, required only for the QL policy plot
     :param label_data: Labels to put on fig. Currently requiered only for QL
     """
-    full_file_path = ROOT_DIR
+    # full_file_path = ROOT_DIR
     if DP_params == None and QL_params == None:
         print("Nothing to plot! Enter either DP or QL params !")
         return
@@ -373,8 +373,7 @@ def plot_learned_policy(g, DP_params = None, QL_params = None,  showfig = False)
                 # if s[0]==0 and a == policy[s]: # to print policy at time t = 0
             a = policy[s]
             if Q[s][a] != init_Q: # to plot policy of only updated states
-                # t,i,j = s
-                i, j = s
+                t, i, j = s
                 xtr.append(g.xs[j])
                 ytr.append(g.ys[g.ni - 1 - i])
                 # print("test", s, a_policy)
@@ -383,26 +382,43 @@ def plot_learned_policy(g, DP_params = None, QL_params = None,  showfig = False)
                 ay_list.append(ay)
                 # print(i,j,g.xs[j], g.ys[g.ni - 1 - i], ax, ay)
 
+        plt.quiver(xtr, ytr, ax_list, ay_list)
+        ax1.scatter(g.xs[g.start_state[2]], g.ys[g.ni - 1 - g.start_state[1]], c='g')
+        ax1.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], c='r')
+        if showfig == True:
+            plt.show()
+        fig1.savefig(full_file_path + '_policy_plot.png', dpi=300)
+
+
+
     if DP_params != None:
         policy, full_file_path = DP_params
-        for s in g.ac_state_space():
-            a = policy[s]
-            i, j = s
-            xtr.append(g.xs[j])
-            ytr.append(g.ys[g.ni - 1 - i])
-            # print("test", s, a_policy)
-            ax, ay = action_to_quiver(a)
-            ax_list.append(ax)
-            ay_list.append(ay)
+        policy_plot_folder = createFolder(join(full_file_path,'policy_plots'))
 
-    plt.quiver(xtr, ytr, ax_list, ay_list)
+        for tt in range(g.nt-1):
+            ax_list =[]
+            ay_list = []
+            xtr = []
+            ytr = []
 
-    ax1.scatter(g.xs[g.start_state[1]], g.ys[g.ni - 1 - g.start_state[0] ], c='g')
-    ax1.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], c='r')
-    if showfig ==True:
-        plt.show()
+            for s in g.ac_state_space(time=tt):
+                a = policy[s]
+                t, i, j = s
+                xtr.append(g.xs[j])
+                ytr.append(g.ys[g.ni - 1 - i])
+                # print("test", s, a_policy)
+                ax, ay = action_to_quiver(a)
+                ax_list.append(ax)
+                ay_list.append(ay)
 
-    fig1.savefig(full_file_path+'_policy_plot.png', dpi=300)
+            plt.quiver(xtr, ytr, ax_list, ay_list)
+            ax1.scatter(g.xs[g.start_state[2]], g.ys[g.ni - 1 - g.start_state[1] ], c='g')
+            ax1.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], c='r')
+            if showfig ==True:
+                plt.show()
+            fig1.savefig(full_file_path + '/policy_plots/policy_plot_t' + str(tt), dpi=300)
+            plt.clf()
+            fig1.clf()
 
     return
 
@@ -445,15 +461,16 @@ def plot_all_policies(g, Q, policy, init_Q , label_data, showfig = False, Iters_
 
     for s in Q.keys():
         t, i, j = s
-        for a in Q[s].keys():
-            if Q[s][a] != init_Q and a==policy[s]:
-                xtr.append(g.xs[j])
-                ytr.append(g.ys[g.ni - 1 - i])
-                # print("test", s, a_policy)
-                ax, ay = action_to_quiver(a)
-                ax_list.append(ax)
-                ay_list.append(ay)
-                # print(i,j,g.xs[j], g.ys[g.ni - 1 - i], ax, ay)
+        if t == 0:
+            for a in Q[s].keys():
+                if Q[s][a] != init_Q and a==policy[s]:
+                    xtr.append(g.xs[j])
+                    ytr.append(g.ys[g.ni - 1 - i])
+                    # print("test", s, a_policy)
+                    ax, ay = action_to_quiver(a)
+                    ax_list.append(ax)
+                    ay_list.append(ay)
+                    # print(i,j,g.xs[j], g.ys[g.ni - 1 - i], ax, ay)
 
 
     plt.quiver(xtr, ytr, ax_list, ay_list)
@@ -502,7 +519,7 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fnam
     ax.grid(which='major', color='#CCCCCC', linestyle='')
     ax.grid(which='minor', color='#CCCCCC', linestyle='--')
     st_point= g.start_state
-    plt.scatter(g.xs[st_point[1]], g.ys[g.ni - 1 - st_point[0]], c='g')
+    plt.scatter(g.xs[st_point[2]], g.ys[g.ni - 1 - st_point[1]], c='g')
     plt.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], c='r')
     plt.grid()
     plt.gca().set_aspect('equal', adjustable='box')
@@ -516,13 +533,13 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fnam
     for rzn in range(n_rzn):
         g.set_state(g.start_state)
         dont_plot =False
-        t = 0
+        # t = 0
         G = 0
 
         xtr = []
         ytr = []
 
-        i, j = g.start_state
+        t, i, j = g.start_state
 
         a = policy[g.current_state()]
         xtr.append(g.x)
@@ -532,8 +549,7 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fnam
         while True:
             r = g.move_exact(a, vStream_x[rzn, i, j], vStream_y[rzn, i, j])
             G = G + r
-            t += 1
-            (i, j) = g.current_state()
+            (t, i, j) = g.current_state()
 
             xtr.append(g.x)
             ytr.append(g.y)

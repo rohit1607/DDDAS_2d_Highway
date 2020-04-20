@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from utils.custom_functions import picklePolicy
+from utils.custom_functions import picklePolicy, calc_mean_and_std, read_pickled_File
 import pickle
 from utils.plot_functions import plot_exact_trajectory, plot_exact_trajectory_set, plot_learned_policy
 
@@ -87,8 +87,8 @@ def run_DP(setup_grid_params, prob_file, output_file, output_path, threshold = 1
     action_state_space = g.ac_state_space()
 
     #Read transition probability
-    with open('DP/Trans_matxs/' + prob_file + '/' + prob_file + '.p', 'rb') as fp:
-        Trans_prob = pickle.load(fp)
+    prob_full_filename = 'DP/Trans_matxs_3D/' + prob_file + '/' + prob_file
+    Trans_prob = read_pickled_File(prob_full_filename)
 
     #Initialise Policy and V
     policy, V = initialise_policy_and_V(g)
@@ -118,9 +118,13 @@ def run_DP(setup_grid_params, prob_file, output_file, output_path, threshold = 1
     trajectory, G = plot_exact_trajectory(g, policy, X, Y, Vx_rzns[eg_rzn,:,:], Vy_rzns[eg_rzn,:,:], output_path, fname='Sample_Traj_with_policy_in rzn_'+ str(eg_rzn), lastfig = True)
     tlist, Glist, badcount = plot_exact_trajectory_set(g, policy, X, Y, Vx_rzns, Vy_rzns, output_path, fname='Traj_set' + output_file)
 
+    # Plot Policy
     plot_learned_policy(g, DP_params = [policy, output_path])
 
     write_list_to_file(tlist, output_path+'/tlist')
     write_list_to_file(Glist, output_path +'/Glist')
 
-    return V[g.startpos], np.mean(tlist), np.std(tlist), badcount, DP_compute_time, np.mean(Glist)
+    mean_tlist,_std_tlist, _, _ = calc_mean_and_std(tlist)
+    mean_glist, _, _, _ = calc_mean_and_std(Glist)
+
+    return V[g.start_state], mean_tlist, np.std(tlist), badcount, DP_compute_time, mean_glist

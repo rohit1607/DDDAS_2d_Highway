@@ -30,7 +30,7 @@ class Grid:
 
         self.endpos = end
         self.startpos = start
-        self.start_state = (start[0], start[1])
+        self.start_state = (0, start[0], start[1])
         # self.edge_states = self.edge_states()
 
         self.r_outbound = -100
@@ -46,9 +46,9 @@ class Grid:
 
     # explicitly set state. state is a tuple of indices(m,n,p)
     def set_state(self, state, xcoord=None, ycoord=None):
-        # self.t = state[0]
-        self.i = state[0]
-        self.j = state[1]
+        self.t = state[0]
+        self.i = state[1]
+        self.j = state[2]
   
         self.x = self.xs[self.j]
         self.y = self.ys[self.ni - 1 - self.i]
@@ -59,7 +59,7 @@ class Grid:
 
 
     def current_state(self):
-        return (int(self.i), int(self.j))
+        return (int(self.t), int(self.i), int(self.j))
 
     def current_pos(self):
         return (int(self.i), int(self.j))
@@ -130,36 +130,45 @@ class Grid:
             if self.is_terminal():
                 r += self.r_terminal
 
+            self.t += self.dt
+
         return r
 
 
     # !! time to mentioned by index !!
     def ac_state_space(self, time=None):
+        """
+        returns states where action is allowed to be performed
+        :param time: ip: int. if time := k , then function returns all states at time k, i.e. (k, ., .)
+        :return: sorted set of states in which action is allowed to be performed
+        """
         a=set()
+        if time == None:
+            for t in range((self.nt) - 1):  # does not include the states in the last time stice.
+                for i in range(self.ni):
+                    for j in range(self.nj):
+                        if ((i,j)!=self.endpos and not self.if_edge_state((i,j)) ):# does not include states with pos as endpos
+                            a.add((t,i,j))
 
-        for i in range(self.ni):
-            for j in range(self.nj):
-                if ((i,j)!=self.endpos and not self.if_edge_state((i,j)) ):# does not include states with pos as endpos
-                    a.add((i,j))
+        else:
+            for i in range(self.ni):
+                for j in range(self.nj):
+                    if ((i, j) != self.endpos and not self.if_edge_state((i, j))):  # does not include states with pos as endpos
+                          a.add((time,i,j))
 
         return sorted(a)
+
+
 
 
     def state_space(self):
         a = set()
-        for i in range(self.ni):
-            for j in range(self.nj):
-                a.add((i,j))
+        for t in range(self.nt):
+            for i in range(self.ni):
+                for j in range(self.nj):
+                    a.add((t,i,j))
 
         return sorted(a)
-    #
-    # def edge_states(self):
-    #     edge_states = []
-    #     for s in self.state_space():
-    #         if (s[0] == 0) or (s[0] == self.ni - 1) or (s[1] ==0) or (s[1] == self.nj - 1):
-    #             edge_states.append(s)
-    #
-    #     return edge_states
 
 
     def if_within_time(self):
@@ -175,17 +184,22 @@ class Grid:
 
 
     def if_within_grid(self,s):
-        i=s[0]
-        j=s[1]
-        return (j<=(self.nj) -1 and j>=0 and i<=(self.ni)-1 and i>=0)
+        """TODO: check whether boudary to be treate as a part of grid or not depending on its usage."""
+        t = s[0]
+        i = s[1]
+        j = s[2]
+        return (j <= (self.nj) - 1 and j >= 0 and i <= (self.ni) - 1 and i >= 0 and t <= (self.nt) - 1 and t >= 0)
 
-    def if_edge_state(self, s):
+    def if_edge_state(self, pos):
         """
         returns True if state is at the edge
-        :param s:
+        :param pos:
         :return:
         """
-        if (s[0] == 0) or (s[0] == self.ni - 1) or (s[1] == 0) or (s[1] == self.nj - 1):
+
+        i = pos[0]
+        j = pos[1]
+        if (i == 0) or (i == self.ni - 1) or (j == 0) or (j == self.nj - 1):
             return True
         else:
             return False

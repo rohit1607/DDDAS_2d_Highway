@@ -63,6 +63,7 @@ def run_Experiment(DP = None, QL = None):
     output_path, exp_num = create_new_dir()          #dirs Exp/1, Exp/2, ...
     DP_path = join(output_path,'DP')                 #dirs Exp/1/DP
     QL_path = join(output_path,'QL')                 #dirs Exp/1/QL
+    print("************  Exp ", exp_num, "************ \n")
 
     # Exp_summary_data
     method = get_method_str(DP, QL)
@@ -99,8 +100,8 @@ def run_Experiment(DP = None, QL = None):
 
 # Training_traj_size_list, ALPHA_list, esp0_list, QL_Iters, init_Q, with_guidance = QL_params
 
-setup_grid_params = setup_grid(num_actions=16)
-model_file = 'Model_7_16a'
+setup_grid_params = setup_grid(num_actions=8,Test_grid=True)
+model_file = 'TestModel_1_8a'
 
 Training_traj_size_list = [5000]
 ALPHA_list = [0.5]
@@ -112,6 +113,6 @@ method = 'reverse_order'
 num_passes = 50
 QL_params = [Training_traj_size_list, ALPHA_list, esp0_list, QL_Iters, init_Q, with_guidance, method, num_passes]
 
-run_Experiment(QL = QL_params)
-# run_Experiment(DP = [model_file])
+# run_Experiment(QL = QL_params)
+run_Experiment(DP = [model_file])
 # run_Experiment(DP = [model_file], QL = QL_params)

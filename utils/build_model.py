@@ -4,6 +4,7 @@ from os.path import join, exists
 import pickle
 import time
 from definition import ROOT_DIR
+import numpy as np
 
 #initialise dictionary for storing counts.
 #transition_dict is a nested dictionary
@@ -20,11 +21,17 @@ def initialise_dict(g):
 #populate transition_dict with counts
 def compute_transition_probability_and_rewards(transition_dict, g, num_rzns, Vx_rzns, Vy_rzns):
     s_count = 0
+    pr_intvl = 100
+    a_time = time.time()
     for s in state_list:
+        n_states = len(state_list)
         s_count += 1
-        i0, j0 = s
-        if s_count%100 == 0:
-            print("s_count: ", s_count)
+        t0, i0, j0 = s
+        if s_count % pr_intvl == 0:
+            b_time = (time.time() - a_time)/60 # time taken per print interval in mins
+            t_left = np.round(b_time * (n_states - s_count)/ pr_intvl , 3 ) #expected time left in minutes
+            a_time = time.time()
+            print("s_count: ", s_count, " /  ", n_states, "  ----  ", np.round(b_time, 3), "min  ----  ", t_left, " mins left" )
         for a in g.actions:
             for rzn in range(num_rzns):
                 g.set_state(s)
@@ -89,7 +96,7 @@ def Build_Model(filename = 'Transition_dict', n_actions = 1, nt = None, dt =None
 
     #name of pickle file containing transtion prob in dictionary format
     filename =  filename + str(n_actions) + 'a'
-    base_path = join(ROOT_DIR,'DP/Trans_matxs/')
+    base_path = join(ROOT_DIR,'DP/Trans_matxs_3D/')
     save_path = base_path + filename
     if exists(save_path):
         print("Folder Already Exists !!")
@@ -112,6 +119,6 @@ def Build_Model(filename = 'Transition_dict', n_actions = 1, nt = None, dt =None
     print("Total TIme = ", total_time/60, "mins")
 
 
-Build_Model(filename='Model_7_',n_actions=16)
+Build_Model(filename='TestModel_1_',n_actions=8, Test_grid=True)
 # Build_Model(filename='Model_1_',n_actions=8)
 # Build_Model(filename='Model_1_',n_actions=16)

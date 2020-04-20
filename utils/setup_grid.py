@@ -72,11 +72,10 @@ def setup_grid(num_actions =16, nt = 100, dt =1, F =1, startpos = (79, 49), endp
 
 
         paths = None
-        startpos = (10,4)
+        startpos = (9,4)
         endpos  = (2,4)
         nt = 20
         dt = 1
-        num_actions = 16
         F = 1
 
         param_str = ['num_actions', 'nt', 'dt', 'F', 'startpos', 'endpos']
@@ -86,8 +85,8 @@ def setup_grid(num_actions =16, nt = 100, dt =1, F =1, startpos = (79, 49), endp
     g = timeOpt_grid(xs, ys, dt, nt, F, startpos, endpos, num_actions=num_actions)
 
     print("Grid Setup Complete !")
-    # CHANGE RUNNER FILE TO GET PARAMS(9TH ARG) IF YOU CHANGE ORDER OF RETURNS HERE
 
+    # CHANGE RUNNER FILE TO GET PARAMS(9TH ARG) IF YOU CHANGE ORDER OF RETURNS HERE
     return g, xs, ys, X, Y, Vx_rzns, Vy_rzns, num_rzns, paths, params, param_str
 
 
