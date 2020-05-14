@@ -63,7 +63,7 @@ def calculate_reward_const_dt(dt, xs, ys, so, sn, vnet_x, vnet_y, a, degree = Fa
         r1 = h/((vnet_x ** 2 + vnet_y ** 2) ** 0.5)
 
         theta1 = get_angle_in_0_2pi(math.atan2(vnet_y, vnet_x))
-        theta2 = get_angle_in_0_2pi(math.atan2(ynw- yo, xnw -xo))
+        theta2 = get_angle_in_0_2pi(math.atan2(ynw- yo, xnw - xo))
         # print("thetas = ",theta1, theta2)
         theta = np.abs(theta1 - theta2)
 

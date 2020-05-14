@@ -3,6 +3,7 @@ import numpy as np
 from utils.custom_functions import picklePolicy
 import pickle
 from utils.plot_functions import plot_exact_trajectory, plot_exact_trajectory_set, plot_learned_policy
+from scipy import sparse
 
 action_state_space = []
 """
@@ -44,6 +45,37 @@ def value_iteration_update(g, V, Trans_prob):
 
     return V, delV, state_flag
 
+
+def VI_update_SpMV_format(g, V, sp_TPM_alist, R_s_alist):
+    """
+    Performs VI update using Sparse Matrix Vector (SpMV) multiplication
+    :param sp_TPM_alist: list of sparse TPM for each action
+    :param R_s_alist: list of Reward(s) vector for each each action
+    :return: converged Value function, V,
+    TODO: check edge state and terminal state values and see if they interfere with logic
+    """
+    # Initialise Value Fn vector of size = no. of states = g.ni*g.nj for 2d problem
+    num_actions = len(g.actions)
+    V_a_mat = np.zeros( ((g.ni * g.nj),num_actions) )
+
+    old_V = V
+    # compute 1step update for each action and store V vector of each action in a column of V_a_mat
+    for i in range(num_actions):
+        V_a_mat[:,i] = R_s_alist[i] + sp_TPM_alist[i].dot(V[:,i])
+
+    # for each state (element of V), find max of each row, i.e max V(s) across all actions
+    for i in range(len(V)):
+        V[i] = np.max(V[i,:])
+
+    delV_vector = np.abs(V - old_V)
+    state_flag = np.argmax(delV_vector)
+    delV = delV_vector[state_flag]
+
+    return V, delV, state_flag
+
+
+
+
 def compute_Policy(g, policy, Trans_prob, V):
     for s in action_state_space:
         g.set_state(s)
@@ -62,6 +94,7 @@ def compute_Policy(g, policy, Trans_prob, V):
         policy[s] = new_a
 
     return policy
+
 
 def pickle_V(V):
     with open('ValueFunc.p', 'wb') as fp:

@@ -1,0 +1,8 @@
+num_actions:    8
+nt:    20
+dt:    1
+F:    1
+startpos:    (9, 4)
+endpos:    (2, 4)
+Reward Structure: ['oubound_penalty = -100', 'Terminal_Reward =100', 'General_reward: calculate_reward_const_dt']
+Build Time: 26.86129093170166

@@ -58,6 +58,7 @@ def setup_grid(num_actions =16, nt = 100, dt =1, F =1, startpos = (79, 49), endp
         xs = XP[1,:]
         ys_temp = YP[:,1]
         ys = np.flip(ys_temp)
+        print("ys",ys)
         X, Y = my_meshgrid(xs, ys)
 
     else:

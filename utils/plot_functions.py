@@ -9,8 +9,6 @@ import matplotlib.colors as colors
 import matplotlib.cm as cmx
 
 
-
-
 def action_to_quiver(a):
     vt = a[0]
     theta = a[1]

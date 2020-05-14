@@ -1,5 +1,5 @@
 from utils.setup_grid import setup_grid
-from utils.custom_functions import createFolder, append_summary_to_summaryFile
+from utils.custom_functions import createFolder, append_summary_to_summaryFile, read_pickled_File
 from os import getcwd, makedirs
 from os.path import join, exists
 import pickle
@@ -13,34 +13,6 @@ def initialise_dict(g):
         transition_dict[s]={}
         for a in g.actions:
             transition_dict[s][a]={}
-
-    return transition_dict
-
-
-#populate transition_dict with counts
-def compute_transition_probability_and_rewards(transition_dict, g, num_rzns, Vx_rzns, Vy_rzns):
-    s_count = 0
-    for s in state_list:
-        s_count += 1
-        i0, j0 = s
-        if s_count%100 == 0:
-            print("s_count: ", s_count)
-        for a in g.actions:
-            for rzn in range(num_rzns):
-                g.set_state(s)
-                r = g.move_exact(a, Vx_rzns[rzn, i0, j0], Vy_rzns[rzn, i0, j0])
-                s_new = g.current_state()
-                if transition_dict[s][a].get(s_new):
-                    transition_dict[s][a][s_new][0] += 1
-                    transition_dict[s][a][s_new][1] += (1/transition_dict[s][a][s_new][0])*(r - transition_dict[s][a][s_new][1])
-                else:
-                    transition_dict[s][a][s_new] = [1, r]
-
-    #convert counts to probabilites
-    for s in state_list:
-        for a in g.actions:
-            for s_new in transition_dict[s][a]:
-                transition_dict[s][a][s_new][0] = transition_dict[s][a][s_new][0]/num_rzns
 
     return transition_dict
 
@@ -72,10 +44,55 @@ def write_files(transition_dict, filename, data):
 
     # append_summary_to_summaryFile(summary_file, )
 
+def get_S_from_S_id(S_id, gsize):
+    """
+    returns (i,j) from combined state ID. this is for 2d
+    :param S_id: combined id of state- one number encapsulating t,i,j  or i,j
+    :param gsize: dim of grid in 1direction
+    :return: S in t
+    TODO: Add t for 3d case
+    """
+
+    i = S_id // gsize
+    j = S_id % gsize
+    S = (i,j)
+
+    return S
+
+def convert_COO_to_dict(tdict, g, coo_file, Rsa_file):
+    """
+    takes in saved coo and Rsa files. unpacks them and converts them to dict
+    :param init_transition_dict:
+    :param g:
+    :param coo_file:
+    :param Rsa_file:
+    :return:
+    TODO: add another loop for T for 3d case
+    """
+    coo_list = read_pickled_File(coo_file)
+    Rs_list = read_pickled_File(Rsa_file)
+    num_actions = len(g.actions)
+
+    for i in range(num_actions):
+        coo = coo_list[i]
+        Rs = Rs_list[i]
+        m, n = coo.shape
+        a = g.actions[i]
+        for k in range(n):
+            S1 = get_S_from_S_id(coo[0, k], g.ni)
+            S2 = get_S_from_S_id(coo[1, k], g.ni)
+            prob = coo[2,k]
+            r = Rs[int(coo[0,k])]
+            try:
+                tdict[S1][a][S2] = (prob, r)
+            except:
+                print(S1, 'is not an actionable state')
+
+    return tdict
 
 
 
-def Build_Model(filename = 'Transition_dict', n_actions = 1, nt = None, dt =None, F =None, startpos = None, endpos = None):
+def get_Model_from_COO(coo_filename, rs_filename, filename = 'Transition_dict',  n_actions = 1, nt = None, dt =None, F =None, startpos = None, endpos = None):
 
     print("Building Model")
     global state_list
@@ -98,7 +115,7 @@ def Build_Model(filename = 'Transition_dict', n_actions = 1, nt = None, dt =None
     #build probability transition dictionary
     state_list = g.ac_state_space()
     init_transition_dict = initialise_dict(g)
-    transition_dict = compute_transition_probability_and_rewards(init_transition_dict, g, num_rzns, Vx_rzns, Vy_rzns)
+    transition_dict = convert_COO_to_dict(init_transition_dict, g, coo_filename, rs_filename)
     build_time = time.time() - start_time
 
     #save dictionary to file
@@ -111,8 +128,9 @@ def Build_Model(filename = 'Transition_dict', n_actions = 1, nt = None, dt =None
     print("Build Time = ", build_time/60, " mins")
     print("Total TIme = ", total_time/60, "mins")
 
+coo_file = '/Users/rohit/workspace/ROHIT/pycuda_transition_clac_tests/H2Df_coo'
+rs_file = '/Users/rohit/workspace/ROHIT/pycuda_transition_clac_tests/H2Df_rsa'
 
-
-Build_Model(filename='Model_6_',n_actions=8)
+get_Model_from_COO( coo_file, rs_file, filename='fromCOO_a', n_actions=16)
 # Build_Model(filename='Model_1_',n_actions=8)
 # Build_Model(filename='Model_1_',n_actions=16)
