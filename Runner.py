@@ -101,6 +101,8 @@ def run_Experiment(DP = None, QL = None):
 
 setup_grid_params = setup_grid(num_actions=16)
 model_file = 'Model_7_16a'
+# model_file = 'GPU_Highway_2D_a16'
+
 
 Training_traj_size_list = [5000]
 ALPHA_list = [0.5]

@@ -63,7 +63,7 @@ def write_files(transition_dict, filename, data):
     # save transition_probs. Pickle it.
     with open(save_path + '/' + filename + '.p', 'wb') as fp:
         pickle.dump(transition_dict, fp, protocol=pickle.HIGHEST_PROTOCOL)
-
+    
     with open(save_path + '/' + filename + '_params.txt', 'w') as f:
         for i in range(len(param_str)):
             f.write(param_str[i] + ':' + '    ' + str(params[i]) + "\n")

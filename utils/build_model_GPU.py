@@ -7,11 +7,102 @@ import time
 from collections import Counter
 from multiprocessing import Pool
 import pickle
+from utils.setup_grid import setup_grid
+# from utils.build_model import write_files
+from definition import ROOT_DIR
+from os.path import join, exists
+from utils.custom_functions import createFolder, append_summary_to_summaryFile, read_pickled_File
+from os import getcwd, makedirs
+
+
 
 
 def pickleFile(file, filename):
     with open(filename + '.p', 'wb') as fp:
         pickle.dump(file, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
+def write_files(transition_dict, filename, data):
+    """
+    Pickles dictionary contaniing model details.
+    Writes parameters to file.
+    Writes parameters to summary file
+    :param transition_dict:
+    :param filename:
+    :return:
+    """
+
+    summary_file = base_path + 'model_summary.csv'
+    params, param_str, reward_structure, build_time = data
+
+    createFolder(save_path)
+
+    # save transition_probs. Pickle it.
+    with open(save_path + '/' + filename + '.p', 'wb') as fp:
+        pickle.dump(transition_dict, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
+    with open(save_path + '/' + filename + '_params.txt', 'w') as f:
+        for i in range(len(param_str)):
+            f.write(param_str[i] + ':' + '    ' + str(params[i]) + "\n")
+        f.write("Reward Structure: " + str(reward_structure) + "\n")
+        f.write("Build Time: "+ str(build_time))
+
+    # append_summary_to_summaryFile(summary_file, )
+#transition_dict is a nested dictionary
+def initialise_dict(g):
+    transition_dict = {}
+    for s in state_list:
+        transition_dict[s]={}
+        for a in g.actions:
+            transition_dict[s][a]={}
+
+    return transition_dict
+
+
+def get_S_from_S_id(S_id, gsize):
+    """
+    returns (i,j) from combined state ID. this is for 2d
+    :param S_id: combined id of state- one number encapsulating t,i,j  or i,j
+    :param gsize: dim of grid in 1direction
+    :return: S in t
+    TODO: Add t for 3d case
+    """
+    i = S_id // gsize
+    j = S_id % gsize
+    S = (i,j)
+
+    return S
+
+
+def convert_COO_to_dict(tdict, g, coo_list, Rs_list):
+    """
+    takes in saved coo and Rsa files. unpacks them and converts them to dict
+    :param init_transition_dict:
+    :param g:
+    :param coo_file:
+    :param Rsa_file:
+    :return:
+    TODO: add another loop for T for 3d case
+    """
+    # coo_list = read_pickled_File(coo_file)
+    # Rs_list = read_pickled_File(Rsa_file)
+    num_actions = len(g.actions)
+
+    for i in range(num_actions):
+        coo = coo_list[i]
+        Rs = Rs_list[i]
+        m, n = coo.shape
+        a = g.actions[i]
+        for k in range(n):
+            S1 = get_S_from_S_id(coo[0, k], g.ni)
+            S2 = get_S_from_S_id(coo[1, k], g.ni)
+            prob = coo[2,k]
+            r = Rs[int(coo[0,k])]
+            try:
+                tdict[S1][a][S2] = (prob, r)
+            except:
+                print(S1, 'is not an actionable state')
+
+    return tdict
 
 
 def get_COO_(results, nrzns, T, save_filename=None):
@@ -64,7 +155,7 @@ def concatenate_results_across_time(coo_list_a, Rs_list_a, full_coo_list_a, full
     return full_coo_list_a, full_Rs_list_a
 
 
-def build_sparse_transition_model_at_T(T, vxrzns_gpu, vyrzns_gpu, params, bDimx, params_gpu, xs_gpu, ys_gpu, ac_angles,
+def build_sparse_transition_model_at_T(T64, vxrzns_gpu, vyrzns_gpu, params, bDimx, params_gpu, xs_gpu, ys_gpu, ac_angles,
                                        results, sumR_sa, save_file_for_each_a=False):
     gsize = int(params[0])
     num_actions = int(params[1])
@@ -276,7 +367,7 @@ def build_sparse_transition_model_at_T(T, vxrzns_gpu, vyrzns_gpu, params, bDimx,
     }
 
     //test: changer from float* to float ac_angle
-    __global__ void transition_calc(float* vx_rzns, float* vy_rzns, float ac_angle, 
+    __global__ void transition_calc(int32_t T, float* vx_rzns, float* vy_rzns, float ac_angle, 
                                             float* xs, float* ys, float* params, float* sumR_sa, float* results)
                                             // resutls directions- 1: along S2;  2: along S1;    3: along columns towards count
     {
@@ -287,7 +378,7 @@ def build_sparse_transition_model_at_T(T, vxrzns_gpu, vyrzns_gpu, params, bDimx,
         float dt = params[4];
         float r_outbound = params[5];
         float r_terminal = params[6];
-        int32_t T = params[7];              //time index of vrzns
+        //int32_t T = params[7];              //time index of vrzns
         int32_t i_term = params[8];         // terminal state indices
         int32_t j_term = params[9];
         int32_t nT = params[10];
@@ -340,11 +431,11 @@ def build_sparse_transition_model_at_T(T, vxrzns_gpu, vyrzns_gpu, params, bDimx,
     # cuda.memcpy_dtoh(sumR_sa2, sumR_sa_gpu)
     # print("sumR_sa",sumR_sa)
     # print("sumR_sa",sumR_sa2[0:10001])
-
+    T = np.array(T64, dtype = np.float32)
     func = mod.get_function("transition_calc")
     for i in range(num_actions):
         # print("to believe ; ",i)
-        func(vxrzns_gpu, vyrzns_gpu, ac_angles[i], xs_gpu, ys_gpu, params_gpu, sumR_sa_gpu_list[i], results_gpu_list[i],
+        func(T, vxrzns_gpu, vyrzns_gpu, ac_angles[i], xs_gpu, ys_gpu, params_gpu, sumR_sa_gpu_list[i], results_gpu_list[i],
              block=(bDimx, 1, 1), grid=(gsize, gsize, (nrzns // bDimx) + 1))
 
     results2_list = []
@@ -366,7 +457,6 @@ def build_sparse_transition_model_at_T(T, vxrzns_gpu, vyrzns_gpu, params, bDimx,
 
     # print("results_a0\n",results2_list[0].T[50::int(gsize**2)])
     print("OK REACHED END OF cuda relevant CODE\n")
-    t2 = time.time()
 
     # make a list of inputs, each elelment for an action. and run parallal get_coo_ for each action
     # if save_file_for_each_a is true then each file must be named appopriately.
@@ -381,7 +471,6 @@ def build_sparse_transition_model_at_T(T, vxrzns_gpu, vyrzns_gpu, params, bDimx,
     with Pool(num_actions) as p:
         coo_list_a = p.starmap(get_COO_, inputs)
     # print("coo print\n", coo.T[4880:4900, :])
-    t3 = time.time()
     print("\n\n")
     # print("time taken by cuda compute and transfer\n", (t2 - t1) / 60)
     # print("time taken for post processing to coo on cpu\n",(t3 - t2) / 60)
@@ -390,9 +479,22 @@ def build_sparse_transition_model_at_T(T, vxrzns_gpu, vyrzns_gpu, params, bDimx,
 
 
 # def build_sparse_transition_model(filename, num_actions, nt, dt, F, end_ij):
-def build_sparse_transition_model():
+def build_sparse_transition_model(filename = 'Transition_dict', n_actions = 1, nt = None, dt =None, F =None, startpos = None, endpos = None, Test_grid =False):
+    
+    global state_list
+    global base_path
+    global save_path
+
+    print("Building Sparse Model")
+    t1 = time.time()
+    #setup grid
+    g, xs, ys, X, Y, Vx_rzns, Vy_rzns, num_rzns, path_mat, setup_params, setup_param_str = setup_grid(num_actions = n_actions, nt = nt, Test_grid= Test_grid)
+
+    """
     # Prepare Data
-    nT = 80  # total no. of time steps
+    nT = 1  # total no. of time steps
+    is_stationary = 1  # 0 is false. any other number is true. is_stationry = 0 (false) means that flow is NOT stationary
+    #  and S2 will be indexed by T+1. if is_stationary = x (true), then S2 is indexed by 0, same as S1.
     # list_size = 10     #predefined size of list for each S2
     gsize = 100  # size of grid along 1 direction. ASSUMING square grid.
     num_actions = 16
@@ -405,10 +507,40 @@ def build_sparse_transition_model():
     T = 0  # time index of vrzns
     i_term = 20  # terminal state indices
     j_term = 50
-    is_stationary = 0  # 0 is false. any other number is true. is_stationry = 0 (false) means that flow is NOT stationary
+    """
+    #setup_params = [num_actions, nt, dt, F, startpos, endpos] reference from setup grid
+    nT = setup_params[1]  # total no. of time steps TODO: check default value
+    is_stationary = 1  # 0 is false. any other number is true. is_stationry = 0 (false) means that flow is NOT stationary
     #  and S2 will be indexed by T+1. if is_stationary = x (true), then S2 is indexed by 0, same as S1.
+    # list_size = 10     #predefined size of list for each S2
+    gsize = g.ni  # size of grid along 1 direction. ASSUMING square grid.
+    num_actions = setup_params[0]
+    nrzns = num_rzns
+    bDimx = nrzns # for small test cases
+    if nrzns>=1000:
+        bDimx = 1000   #for large problems     
+    dt = setup_params[2]
+    F = setup_params[3]
+    r_outbound = g.r_outbound
+    r_terminal = g.r_terminal
+    i_term = g.endpos[0]  # terminal state indices
+    j_term = g.endpos[1]
+    dummyT = 0
+
+    #name of output pickle file containing transtion prob in dictionary format
+    if nT > 1:
+        prefix = '3D_' + str(nT) + 'nT_a'
+    else:
+        prefix = '2D_a'
+    filename =  filename + prefix + str(n_actions) #TODO: change filename
+    base_path = join(ROOT_DIR,'DP/Trans_matxs/')
+    save_path = base_path + filename
+    if exists(save_path):
+        print("Folder Already Exists !!\n")
+        return
+
     params = np.array(
-        [gsize, num_actions, nrzns, F, dt, r_outbound, r_terminal, T, i_term, j_term, nT, is_stationary]).astype(
+        [gsize, num_actions, nrzns, F, dt, r_outbound, r_terminal, dummyT, i_term, j_term, nT, is_stationary]).astype(
         np.float32)
     st_sp_size = (gsize ** 2) * nT  # size of total state space
     save_file_for_each_a = False
@@ -423,8 +555,10 @@ def build_sparse_transition_model():
     #  informational initialisations
     ac_angles = np.linspace(0, 2 * pi, num_actions, dtype=np.float32)
     ac_angle = ac_angles[0].astype(np.float32)
-    xs = np.arange(gsize, dtype=np.float32)
-    ys = np.arange(gsize, dtype=np.float32)
+    # xs = np.arange(gsize, dtype=np.float32)
+    # ys = np.arange(gsize, dtype=np.float32)
+    xs = xs.astype(np.float32)
+    ys = ys.astype(np.float32)
     print("params: \n", params, "\n\n")
 
     t1 = time.time()
@@ -445,6 +579,9 @@ def build_sparse_transition_model():
 
     for T in range(nT):
         print("Computing data for timestep, T = ", T, '\n')
+        # params[7] = T
+        # cuda.memcpy_htod(params_gpu, params)
+
 
         # Load Velocities
         # vxrzns = np.zeros((nrzns, gsize, gsize), dtype = np.float32)
@@ -452,8 +589,10 @@ def build_sparse_transition_model():
         # for i in range(int(nrzns/2)):
         #     vxrzns[i,int(gsize/2 -1):int(gsize/2 +1),:] = 1
         # vyrzns = np.zeros((nrzns, gsize, gsize), dtype = np.float32)
-        vxrzns = np.load('/home/rohit/Documents/Research/ICRA_2020/DDDAS_2D_Highway/Input_data_files/Velx_5K_rlzns.npy')
-        vyrzns = np.load('/home/rohit/Documents/Research/ICRA_2020/DDDAS_2D_Highway/Input_data_files/Vely_5K_rlzns.npy')
+        # vxrzns = np.load('/home/rohit/Documents/Research/ICRA_2020/DDDAS_2D_Highway/Input_data_files/Velx_5K_rlzns.npy')
+        # vyrzns = np.load('/home/rohit/Documents/Research/ICRA_2020/DDDAS_2D_Highway/Input_data_files/Vely_5K_rlzns.npy')
+        vxrzns = Vx_rzns
+        vyrzns = Vy_rzns
         vxrzns = vxrzns.astype(np.float32)
         vyrzns = vyrzns.astype(np.float32)
         # TODO: sanity check on dimensions: compare loaded matrix shape with gsize, numrzns
@@ -479,15 +618,27 @@ def build_sparse_transition_model():
             full_coo_list_a = coo_list_a
             full_Rs_list_a = Rs_list_a
 
-    if nT > 1:
-        prefix = 'H3D_' + str(nT) + 'nT_a'
-    else:
-        prefix = 'H2D_a'
-    pickleFile(full_coo_list_a, prefix + str(num_actions) + '_COO')
-    pickleFile(full_Rs_list_a, prefix + str(num_actions) + '_Rsa')
+    t2 = time.time()
+    build_time = t2 - t1
+
+    #save data to file
+    # data = setup_params, setup_param_str, g.reward_structure, build_time
+    # write_files(full_coo_list_a, filename + '_COO', data)
+    # pickleFile(full_coo_list_a, save_path + '/' + filename + '_COO')
+    # pickleFile(full_Rs_list_a, save_path + '/' + filename + '_Rsa')
+    # print("Pickled sparse files !")
+
+    #build probability transition dictionary
+    state_list = g.ac_state_space()
+    init_transition_dict = initialise_dict(g)
+    transition_dict = convert_COO_to_dict(init_transition_dict, g, full_coo_list_a, full_Rs_list_a)
+
+    #save dictionary to file
+    data = setup_params, setup_param_str, g.reward_structure, build_time
+    write_files(transition_dict, filename, data)
 
 
-t1 = time.time()
-build_sparse_transition_model()
-t2 = time.time()
-print("Time for 1 timestep = ", t2 - t1, " secs")
+# t1 = time.time()
+# build_sparse_transition_model(filename = 'Highway_', n_actions = 16, nt = 1)
+# t2 = time.time()
+# print("Time for 1 timestep = ", t2 - t1, " secs")
