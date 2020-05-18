@@ -66,8 +66,11 @@ def get_S_from_S_id(S_id, gsize):
     :return: S in t
     TODO: Add t for 3d case
     """
-    i = S_id // gsize
-    j = S_id % gsize
+    # t = int(S_id // (gsize**2))
+    if S_id >= gsize**2:
+        print("prob: ",S_id)
+    i = int(S_id // gsize)
+    j = int(S_id % gsize)
     S = (i,j)
 
     return S
@@ -155,7 +158,7 @@ def concatenate_results_across_time(coo_list_a, Rs_list_a, full_coo_list_a, full
     return full_coo_list_a, full_Rs_list_a
 
 
-def build_sparse_transition_model_at_T(T64, vxrzns_gpu, vyrzns_gpu, params, bDimx, params_gpu, xs_gpu, ys_gpu, ac_angles,
+def build_sparse_transition_model_at_T(T, T_gpu, vxrzns_gpu, vyrzns_gpu, params, bDimx, params_gpu, xs_gpu, ys_gpu, ac_angles,
                                        results, sumR_sa, save_file_for_each_a=False):
     gsize = int(params[0])
     num_actions = int(params[1])
@@ -367,7 +370,7 @@ def build_sparse_transition_model_at_T(T64, vxrzns_gpu, vyrzns_gpu, params, bDim
     }
 
     //test: changer from float* to float ac_angle
-    __global__ void transition_calc(int32_t T, float* vx_rzns, float* vy_rzns, float ac_angle, 
+    __global__ void transition_calc(float* T_arr, float* vx_rzns, float* vy_rzns, float ac_angle, 
                                             float* xs, float* ys, float* params, float* sumR_sa, float* results)
                                             // resutls directions- 1: along S2;  2: along S1;    3: along columns towards count
     {
@@ -383,6 +386,8 @@ def build_sparse_transition_model_at_T(T64, vxrzns_gpu, vyrzns_gpu, params, bDim
         int32_t j_term = params[9];
         int32_t nT = params[10];
         int32_t is_stationary = params[11];
+
+        int32_t T = (int32_t)T_arr[0];
 
         int32_t idx = get_thread_idx();
         if(idx < gridDim.x*gridDim.y*nrzns)
@@ -431,11 +436,11 @@ def build_sparse_transition_model_at_T(T64, vxrzns_gpu, vyrzns_gpu, params, bDim
     # cuda.memcpy_dtoh(sumR_sa2, sumR_sa_gpu)
     # print("sumR_sa",sumR_sa)
     # print("sumR_sa",sumR_sa2[0:10001])
-    T = np.array(T64, dtype = np.float32)
+    # T = np.array(T64, dtype = np.float32)
     func = mod.get_function("transition_calc")
     for i in range(num_actions):
         # print("to believe ; ",i)
-        func(T, vxrzns_gpu, vyrzns_gpu, ac_angles[i], xs_gpu, ys_gpu, params_gpu, sumR_sa_gpu_list[i], results_gpu_list[i],
+        func(T_gpu, vxrzns_gpu, vyrzns_gpu, ac_angles[i], xs_gpu, ys_gpu, params_gpu, sumR_sa_gpu_list[i], results_gpu_list[i],
              block=(bDimx, 1, 1), grid=(gsize, gsize, (nrzns // bDimx) + 1))
 
     results2_list = []
@@ -513,6 +518,8 @@ def build_sparse_transition_model(filename = 'Transition_dict', n_actions = 1, n
     is_stationary = 1  # 0 is false. any other number is true. is_stationry = 0 (false) means that flow is NOT stationary
     #  and S2 will be indexed by T+1. if is_stationary = x (true), then S2 is indexed by 0, same as S1.
     # list_size = 10     #predefined size of list for each S2
+    # if nt > 1:
+    #     is_stationary = 0
     gsize = g.ni  # size of grid along 1 direction. ASSUMING square grid.
     num_actions = setup_params[0]
     nrzns = num_rzns
@@ -551,6 +558,7 @@ def build_sparse_transition_model(filename = 'Transition_dict', n_actions = 1, n
     vyrzns = np.zeros((nrzns, gsize, gsize), dtype=np.float32)
     results = -1 * np.ones(((gsize ** 2) * nrzns), dtype=np.float32)
     sumR_sa = np.zeros(st_sp_size).astype(np.float32)
+    Tdummy = np.zeros(2, dtype = np.float32)
 
     #  informational initialisations
     ac_angles = np.linspace(0, 2 * pi, num_actions, dtype=np.float32)
@@ -570,6 +578,7 @@ def build_sparse_transition_model(filename = 'Transition_dict', n_actions = 1, n
     xs_gpu = cuda.mem_alloc(xs.nbytes)
     ys_gpu = cuda.mem_alloc(ys.nbytes)
     params_gpu = cuda.mem_alloc(params.nbytes)
+    T_gpu = cuda.mem_alloc(Tdummy.nbytes)
 
     # copies contents of a to  allocated memory on gpu
     cuda.memcpy_htod(ac_angle_gpu, ac_angle)
@@ -577,12 +586,12 @@ def build_sparse_transition_model(filename = 'Transition_dict', n_actions = 1, n
     cuda.memcpy_htod(ys_gpu, ys)
     cuda.memcpy_htod(params_gpu, params)
 
+
     for T in range(nT):
         print("Computing data for timestep, T = ", T, '\n')
         # params[7] = T
         # cuda.memcpy_htod(params_gpu, params)
-
-
+        Tdummy[0] = T
         # Load Velocities
         # vxrzns = np.zeros((nrzns, gsize, gsize), dtype = np.float32)
         # #expectinf to see probs of 0.5 in stream area
@@ -595,13 +604,17 @@ def build_sparse_transition_model(filename = 'Transition_dict', n_actions = 1, n
         vyrzns = Vy_rzns
         vxrzns = vxrzns.astype(np.float32)
         vyrzns = vyrzns.astype(np.float32)
+        Tdummy = Tdummy.astype(np.float32)
+
         # TODO: sanity check on dimensions: compare loaded matrix shape with gsize, numrzns
 
         # copy loaded velocities to gpu
         cuda.memcpy_htod(vxrzns_gpu, vxrzns)
         cuda.memcpy_htod(vyrzns_gpu, vyrzns)
+        cuda.memcpy_htod(T_gpu, Tdummy)
 
-        coo_list_a, Rs_list_a = build_sparse_transition_model_at_T(T, vxrzns_gpu, vyrzns_gpu, params, bDimx, params_gpu,
+
+        coo_list_a, Rs_list_a = build_sparse_transition_model_at_T(T, T_gpu, vxrzns_gpu, vyrzns_gpu, params, bDimx, params_gpu,
                                                                    xs_gpu, ys_gpu,
                                                                    ac_angles, results, sumR_sa,
                                                                    save_file_for_each_a=False)
