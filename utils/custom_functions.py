@@ -526,5 +526,4 @@ def calc_mean_and_std(scalar_list):
     std = var**0.5
     none_cnt = num_rzns - cnt
 
-
     return mean, std, cnt, none_cnt

@@ -100,18 +100,21 @@ def run_Experiment(DP = None, QL = None):
 
 # Training_traj_size_list, ALPHA_list, esp0_list, QL_Iters, init_Q, with_guidance = QL_params
 
-setup_grid_params = setup_grid(num_actions=8,Test_grid=True)
-model_file = 'TestModel_1_8a'
+setup_grid_params = setup_grid(num_actions=16, nt = 90, Test_grid=False)
+model_file = 'GPU_test_5_3D_90nT_a16'
 
 Training_traj_size_list = [5000]
 ALPHA_list = [0.5]
 esp0_list = [0.25]
+
 QL_Iters = 100
 init_Q = -1e6
 with_guidance = True
 method = 'reverse_order'
 num_passes = 50
 QL_params = [Training_traj_size_list, ALPHA_list, esp0_list, QL_Iters, init_Q, with_guidance, method, num_passes]
+
+print("Launnching experiment")
 
 # run_Experiment(QL = QL_params)
 run_Experiment(DP = [model_file])

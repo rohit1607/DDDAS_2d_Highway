@@ -119,6 +119,6 @@ def Build_Model(filename = 'Transition_dict', n_actions = 1, nt = None, dt =None
     print("Total TIme = ", total_time/60, "mins")
 
 
-Build_Model(filename='TestModel_1_',n_actions=8, Test_grid=True)
+# Build_Model(filename='TestModel_1_',n_actions=8, Test_grid=True)
 # Build_Model(filename='Model_1_',n_actions=8)
 # Build_Model(filename='Model_1_',n_actions=16)

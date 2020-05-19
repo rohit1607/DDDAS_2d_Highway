@@ -3,8 +3,9 @@ import numpy as np
 from utils.custom_functions import picklePolicy, calc_mean_and_std, read_pickled_File
 import pickle
 from utils.plot_functions import plot_exact_trajectory, plot_exact_trajectory_set, plot_learned_policy
+from definition import ROOT_DIR
 
-action_state_space = []
+# action_state_space = []
 """
 __________________________________FUNCTIONS_______________________________________________________--
 """
@@ -25,11 +26,20 @@ def value_iteration_update(g, V, Trans_prob):
         old_V = V[s]
         g.set_state(s)
         best_val = -float('inf')
+        # if s[0] == g.nt - 1:
+        #     print("- - - at t nt-1: ,", s, a[1], s_new)
+        # print("*--- ",s)
+        # print("** ",Trans_prob[s],'\n')
         for a in g.actions:
             val = 0
+            # print("****   ",Trans_prob[s][a])
             for s_new in Trans_prob[s][a]:
-                prob, r = Trans_prob[s][a][s_new]
-                val += prob * (r + V[s_new])
+                try:
+                    prob, r = Trans_prob[s][a][s_new]
+                    val += prob * (r + V[s_new])
+                except:
+                    print("Exception")
+                    print(s, np.round(a[1], 3), s_new)
                 # prob, _ = Trans_prob[s][a][s_new]
                 # val += prob * (g.R(s, s_new) + V[s_new])
             if val > best_val:
@@ -82,12 +92,13 @@ def run_DP(setup_grid_params, prob_file, output_file, output_path, threshold = 1
 
     #Set up grid
     g, xs, ys, X, Y, Vx_rzns, Vy_rzns, num_rzns, path_mat, params, param_str = setup_grid_params
-
+    print("g.nt: ", g.nt)
     global action_state_space
     action_state_space = g.ac_state_space()
+    # print(action_state_space)
 
     #Read transition probability
-    prob_full_filename = 'DP/Trans_matxs_3D/' + prob_file + '/' + prob_file
+    prob_full_filename = ROOT_DIR + '/DP/Trans_matxs_3D/' + prob_file + '/' + prob_file
     Trans_prob = read_pickled_File(prob_full_filename)
 
     #Initialise Policy and V
@@ -98,6 +109,7 @@ def run_DP(setup_grid_params, prob_file, output_file, output_path, threshold = 1
     #Iterate VI updates
     while True:
         countb += 1
+        print("iter: ", countb)
 
         V, del_V_max, flagged_state = value_iteration_update(g, V, Trans_prob)
 
@@ -109,21 +121,28 @@ def run_DP(setup_grid_params, prob_file, output_file, output_path, threshold = 1
             break
 
     # Compute policy
+    print("launch compute policy")
     policy = compute_Policy(g, policy, Trans_prob, V)
     end = time.time()
     DP_compute_time = end - start
     # Save policy to file
+    print("pickle policy")
     picklePolicy(policy, output_path + '/policy')
 
+    print("plot exct trajectory")
     trajectory, G = plot_exact_trajectory(g, policy, X, Y, Vx_rzns[eg_rzn,:,:], Vy_rzns[eg_rzn,:,:], output_path, fname='Sample_Traj_with_policy_in rzn_'+ str(eg_rzn), lastfig = True)
+    print("plot exct trajectory set")
     tlist, Glist, badcount = plot_exact_trajectory_set(g, policy, X, Y, Vx_rzns, Vy_rzns, output_path, fname='Traj_set' + output_file)
 
     # Plot Policy
+    print("plot policy")
     plot_learned_policy(g, DP_params = [policy, output_path])
 
+    print("write list to file")
     write_list_to_file(tlist, output_path+'/tlist')
     write_list_to_file(Glist, output_path +'/Glist')
 
+    print("calc mean and std")
     mean_tlist,_std_tlist, _, _ = calc_mean_and_std(tlist)
     mean_glist, _, _, _ = calc_mean_and_std(Glist)
 
