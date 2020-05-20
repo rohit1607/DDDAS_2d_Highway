@@ -38,7 +38,7 @@ def value_iteration_update(g, V, Trans_prob):
                     prob, r = Trans_prob[s][a][s_new]
                     val += prob * (r + V[s_new])
                 except:
-                    print("Exception")
+                    print("Exception in VI")
                     print(s, np.round(a[1], 3), s_new)
                 # prob, _ = Trans_prob[s][a][s_new]
                 # val += prob * (g.R(s, s_new) + V[s_new])
@@ -62,8 +62,12 @@ def compute_Policy(g, policy, Trans_prob, V):
         for a in g.actions:
             val = 0
             for s_new in Trans_prob[s][a]:
-                prob, r = Trans_prob[s][a][s_new]
-                val += prob * (r + V[s_new])
+                try:
+                    prob, r = Trans_prob[s][a][s_new]
+                    val += prob * (r + V[s_new])
+                except:
+                    print("Exception in compute_policy()")
+                    print(s, np.round(a[1], 3), s_new)
                 # prob, _ = Trans_prob[s][a][s_new]
                 # val += prob * (g.R(s, s_new) + V[s_new])
             if val > best_val:
@@ -109,11 +113,11 @@ def run_DP(setup_grid_params, prob_file, output_file, output_path, threshold = 1
     #Iterate VI updates
     while True:
         countb += 1
-        print("iter: ", countb)
+        # print("iter: ", countb)
 
         V, del_V_max, flagged_state = value_iteration_update(g, V, Trans_prob)
 
-        if countb % 100 == 0:
+        if countb % 10 == 0:
             print("iter: ", countb, del_V_max, flagged_state)
 
         if del_V_max< threshold:

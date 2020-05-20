@@ -100,8 +100,8 @@ def run_Experiment(DP = None, QL = None):
 
 # Training_traj_size_list, ALPHA_list, esp0_list, QL_Iters, init_Q, with_guidance = QL_params
 
-setup_grid_params = setup_grid(num_actions=16, nt = 90, Test_grid=False)
-model_file = 'GPU_test_5_3D_90nT_a16'
+setup_grid_params = setup_grid(num_actions=16, nt = 20, Test_grid=True)
+model_file = 'CPU_testGrid_6_16a'
 
 Training_traj_size_list = [5000]
 ALPHA_list = [0.5]

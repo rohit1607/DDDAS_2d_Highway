@@ -15,8 +15,6 @@ from utils.custom_functions import createFolder, append_summary_to_summaryFile, 
 from os import getcwd, makedirs
 
 
-
-
 def pickleFile(file, filename):
     with open(filename + '.p', 'wb') as fp:
         pickle.dump(file, fp, protocol=pickle.HIGHEST_PROTOCOL)
@@ -104,8 +102,9 @@ def convert_COO_to_dict(tdict, g, coo_list, Rs_list):
             try:
                 tdict[S1][a][S2] = (prob, r)
             except:
-                if S1[0] == 0:
-                    print(S1, 'is not an actionable state', a, S2, prob, r)
+                pass
+                # if S1[0] == 0:
+                #     print(S1, 'is not an actionable state', a, S2, prob, r)
 
     return tdict
 
@@ -270,6 +269,12 @@ def build_sparse_transition_model_at_T(T, T_gpu, vxrzns_gpu, vyrzns_gpu, params,
             theta = fabsf(theta1 -theta2);
             r2 = fabsf(sinf(theta));
             dt_new = r1 + r2;
+
+            if (threadIdx.x == 0 && blockIdx.z == 0 && blockIdx.x == 1 && blockIdx.y == 1)
+            {
+                params[24] = r1;
+                params[25] = r2;
+            }
         }
         return -dt_new;
     }
@@ -294,6 +299,20 @@ def build_sparse_transition_model_at_T(T, T_gpu, vxrzns_gpu, vyrzns_gpu, params,
             get_xypos_from_ij(i0, j0, xs, ys, &x, &y); // x, y stores centre coords of state i0,j0
             float xnew = x + (vnetx * dt);
             float ynew = y + (vnety * dt);
+
+            //checks TODO: remove checks once verified
+            if (threadIdx.x == 0 && blockIdx.z == 0 && blockIdx.x == 1 && blockIdx.y == 1)
+            {
+                params[12] = x;
+                params[13] = y;
+                params[14] = vnetx;
+                params[15] = vnety;
+                params[16] = xnew;
+                params[17] = ynew;
+                params[18] = ac_angle;
+            }
+
+
             if (xnew > xs[n])
                 {
                     xnew = xs[n];
@@ -314,6 +333,7 @@ def build_sparse_transition_model_at_T(T, T_gpu, vxrzns_gpu, vyrzns_gpu, params,
                     ynew =  ys[0];
                     *r += r_outbound;
                 }
+
             // TODO:xxDONE check logic wrt remainderf. remquof had issue
             int32_t xind, yind;
             //float remx = remquof((xnew - xs[0]), Dj, &xind);
@@ -343,13 +363,31 @@ def build_sparse_transition_model_at_T(T, T_gpu, vxrzns_gpu, vyrzns_gpu, params,
                         {
                             *r += r_outbound;
                         }
+                    
+                    if (threadIdx.x == 0 && blockIdx.z == 0 && blockIdx.x == 1 && blockIdx.y == 1)
+                    {
+                        params[26] = 9999;
+                    }
                 }
+
             r_step = calculate_reward_const_dt(xs, ys, i0, j0, x, y, posids, params, vnetx, vnety);
             *r += r_step; //TODO: numerical check remaining
             if (is_terminal(posids[0], posids[1], params))
                 {
                     *r += r_terminal;
                 }
+            
+            if (threadIdx.x == 0 && blockIdx.z == 0 && blockIdx.x == 1 && blockIdx.y == 1)
+            {
+                params[19] = xnew;
+                params[20] = ynew;
+                params[21] = yind;
+                params[22] = xind;
+                params[23] = *r;
+                //params[17] = ynew;
+                //params[18] = ac_angle;
+            }
+
     }
     //test: changer from float* to float ac_angle
     __global__ void transition_calc(float* T_arr, float* vx_rzns, float* vy_rzns, float ac_angle, 
@@ -373,6 +411,7 @@ def build_sparse_transition_model_at_T(T, T_gpu, vxrzns_gpu, vyrzns_gpu, params,
         if(idx < gridDim.x*gridDim.y*nrzns)
         {
             int32_t posids[2] = {blockIdx.y, blockIdx.x};    //static declaration of array of size 2 to hold i and j values of S1. 
+            int32_t sp_id;      //sp_id is space_id. S1%(gsize*gsize)
             //  Afer move() these will be overwritten by i and j values of S2
             float r;              // to store immediate reward
             float vx = vx_rzns[idx];
@@ -390,9 +429,10 @@ def build_sparse_transition_model_at_T(T, T_gpu, vxrzns_gpu, vyrzns_gpu, params,
             {
                 S1 = state1D_from_thread(T);     //get init state number corresponding to thread id
                 S2 = state1D_from_ij(posids, T+1);   //get successor state number corresponding to posid and next timestep T+1        
+                sp_id = S1%(gsize*gsize);
             }
             //writing to sumR_sa. this array will later be divided by num_rzns, to get the avg
-            float a = atomicAdd(&sumR_sa[S1], r); //TODO: try reduction if this is slow overall
+            float a = atomicAdd(&sumR_sa[sp_id], r); //TODO: try reduction if this is slow overall
             results[idx] = S2;
             __syncthreads();
             /*if (threadIdx.x == 0 && blockIdx.z == 0)
@@ -410,11 +450,31 @@ def build_sparse_transition_model_at_T(T, T_gpu, vxrzns_gpu, vyrzns_gpu, params,
     # print("sumR_sa",sumR_sa)
     # print("sumR_sa",sumR_sa2[0:10001])
     # T = np.array(T64, dtype = np.float32)
+    params2 = np.empty_like(params).astype(np.float32)
     func = mod.get_function("transition_calc")
     for i in range(num_actions):
         # print("to believe ; ",i)
         func(T_gpu, vxrzns_gpu, vyrzns_gpu, ac_angles[i], xs_gpu, ys_gpu, params_gpu, sumR_sa_gpu_list[i], results_gpu_list[i],
              block=(bDimx, 1, 1), grid=(gsize, gsize, (nrzns // bDimx) + 1))
+        if i == 0:
+            cuda.memcpy_dtoh(params2, params_gpu)
+            print("params check:",)
+            print(  '\nangle= ', params2[18],
+                    '\nx =' ,params2[12],
+                '\ny =' ,params2[13] ,
+                    '\nvnetx = ',params2[14],
+                    '\nvnety =', params2[15],
+                    '\nxnew =', params2[16],
+                    '\nynew =', params2[17],
+                    '\nxnewupd =', params2[19],
+                    '\nynewupd =', params2[20],
+                    '\nyind i=', params2[21],
+                    '\nxind j=', params2[22],
+                    '\nr- =', params2[23],
+                    '\nr1+ =', params2[24],
+                    '\nr2+ =', params2[25],
+                    '\nenter_isnan =', params2[26]
+                )
 
     results2_list = []
     sum_Rsa2_list = []
@@ -457,7 +517,7 @@ def build_sparse_transition_model_at_T(T, T_gpu, vxrzns_gpu, vyrzns_gpu, params,
 
 
 # def build_sparse_transition_model(filename, num_actions, nt, dt, F, end_ij):
-def build_sparse_transition_model(filename = 'Transition_dict', n_actions = 1, nt = None, dt =None, F =None, startpos = None, endpos = None, Test_grid =False):
+def build_sparse_transition_model(filename = 'Transition_dict', n_actions = 8, nt = None, dt =None, F =None, startpos = None, endpos = None, Test_grid =False):
     
     global state_list
     global base_path
@@ -518,11 +578,13 @@ def build_sparse_transition_model(filename = 'Transition_dict', n_actions = 1, n
     if exists(save_path):
         print("Folder Already Exists !!\n")
         return
-
+    # TODO: remove z from params. it is only for chekcs
+    z=-1
     params = np.array(
-        [gsize, num_actions, nrzns, F, dt, r_outbound, r_terminal, dummyT, i_term, j_term, nT, is_stationary]).astype(
+        [gsize, num_actions, nrzns, F, dt, r_outbound, r_terminal, dummyT, i_term, j_term, nT, is_stationary, z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z,z]).astype(
         np.float32)
-    st_sp_size = (gsize ** 2) * nT  # size of total state space
+    st_sp_size = (gsize ** 2) # size of total state space
+    print("check stsp_size", gsize, nT, st_sp_size)
     save_file_for_each_a = False
 
     # cpu initialisations.
@@ -534,7 +596,7 @@ def build_sparse_transition_model(filename = 'Transition_dict', n_actions = 1, n
     Tdummy = np.zeros(2, dtype = np.float32)
 
     #  informational initialisations
-    ac_angles = np.linspace(0, 2 * pi, num_actions, dtype=np.float32)
+    ac_angles = np.linspace(0, 2 * pi, num_actions, endpoint =  False, dtype=np.float32)
     ac_angle = ac_angles[0].astype(np.float32)
     # xs = np.arange(gsize, dtype=np.float32)
     # ys = np.arange(gsize, dtype=np.float32)
