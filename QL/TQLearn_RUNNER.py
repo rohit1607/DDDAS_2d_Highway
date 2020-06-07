@@ -1,40 +1,32 @@
 from QL.Build_Q_from_Trajs import Learn_policy_from_data
 from utils.plot_functions import plot_max_delQs, plot_exact_trajectory_set, plot_max_Qvalues, plot_learned_policy
 from QL.Q_Learning import Q_learning_Iters
-from utils.custom_functions import initialise_policy, initialise_Q_N, initialise_guided_Q_N, writePolicytoFile, initialise_policy_from_initQ, createFolder, calc_mean_and_std
+from utils.custom_functions import initialise_policy, initialise_Q_N, initialise_guided_Q_N, writePolicytoFile, initialise_policy_from_initQ, createFolder, calc_mean_and_std, append_summary_to_summaryFile
 import time
 import math
 import numpy as np
-from definition import ROOT_DIR
+from definition import ROOT_DIR, N_inc
 from os.path import join
 Pi = math.pi
 
 
-def run_QL(setup_grid_params, QL_params, QL_path):
+def run_QL(setup_grid_params, QL_params, QL_path, exp_num):
     
     exp =  QL_path
 
-#Parameters
-# Training_traj_size_list = [1000, 2000, 3000, 4000, 5000]
-# ALPHA_list = [0.2, 0.35, 0.5, 0.75]
-# esp0_list = [0.25, 0.5, 0.75]
-
-# with_guidance = True
-# Training_traj_size_list = [5000]
-# ALPHA_list = [0.5]
-# esp0_list = [0.5]
-# QL_Iters = int(1000)
-# 
 # init_Q = -1000000
 #     stream_speed = 0.2
 
-    Training_traj_size_list, ALPHA_list, esp0_list, QL_Iters, init_Q, with_guidance, method, num_passes = QL_params
+    Training_traj_size_list, ALPHA_list, esp0_list, QL_Iters, init_Q, with_guidance, method, num_passes, eps_dec_method = QL_params
     
     #Read data from files
-    g, xs, ys, X, Y, Vx_rzns, Vy_rzns, num_rzns, paths, params, param_str = setup_grid_params
-    print("In TQLearn: ", len(params), params)
-    num_actions, nt, dt, F, startpos, endpos = params
+    #setup_params (from setup_grid.py)= [num_actions, nt, dt, F, startpos, endpos]
+    g, xs, ys, X, Y, Vx_rzns, Vy_rzns, num_rzns, paths, setup_params, setup_param_str = setup_grid_params
+    print("In TQLearn: ", len(setup_params), setup_params)
+    num_actions, nt, dt, F, startpos, endpos = setup_params
     
+
+    #print QL Parameters to file
     total_cases = len(Training_traj_size_list)*len(ALPHA_list)*len(esp0_list)
     str_Params = ['with_guidance','Training_traj_size_list', 'ALPHA_list', 'esp0_list', 'QL_Iters', 'num_actions', 'init_Q', 'dt', 'F']
     Params = [with_guidance, Training_traj_size_list, ALPHA_list, esp0_list, QL_Iters, num_actions, init_Q, dt, F]
@@ -44,6 +36,7 @@ def run_QL(setup_grid_params, QL_params, QL_path):
         print(str_Params[i]+':  ',Params[i], file=outputfile)
     outputfile.close()
     
+
     #Create Sub-directories for different hyper parameters
     for eps_0 in esp0_list:
         for ALPHA in ALPHA_list:
@@ -51,12 +44,17 @@ def run_QL(setup_grid_params, QL_params, QL_path):
                 directory = exp + '/dt_size_' + str(dt_size) + '/ALPHA_' + str(ALPHA) + '/eps_0_' + str(eps_0)
                 createFolder(directory)
 
-    case =0
-    start =time.time()
+
+    case =0 #initilise case. Each case is an experiment with a particular combination of eps_0, ALPHA and dt_size
+    output_parameters_all_cases = []    # contains output params for runQL for all the cases
+
+    t_start_RUN_QL = time.time()
+    
     for eps_0 in esp0_list:
         for ALPHA in ALPHA_list:
             for dt_size in Training_traj_size_list:
 
+                t_start_case = time.time()
                 dir_path = exp + '/dt_size_' + str(dt_size) + '/ALPHA_' + str(ALPHA) + '/eps_0_' + str(eps_0) +'/'
                 case+=1
                 print("*******  CASE: ", case, '/', total_cases, '*******')
@@ -65,21 +63,31 @@ def run_QL(setup_grid_params, QL_params, QL_path):
                 print('ALPHA =', ALPHA)
                 print('dt_size = ', dt_size)
 
-
-                #Reset Variables and environment
+                # Reset Variables and environment
+                # (Re)initialise Q and N based on with_guidance paramter
+                # HCparams
                 if with_guidance==True:
-                    Q, N = initialise_guided_Q_N(g, init_Q, init_Q/2,  1)
+                    Q, N = initialise_guided_Q_N(g, init_Q, init_Q/2,  1) #(g, init_Qval, guiding_Qval,  init_Nval)
                 else:
-                    Q, N = initialise_Q_N(g,init_Q, 1)
+                    Q, N = initialise_Q_N(g,init_Q, 1) #(g, init_Qval, init_Nval)
+
                 g.set_state(g.start_state)
+                print("Q and N intialised!")
 
 
                 #Learn Policy From Trajectory Data
+                #if trajectory data is given, learn from it. otherwise just initilise a policy and go to refinemnet step. The latter becomes model-free QL
                 if dt_size != 0:
                     Q, policy, max_delQ_list_1 = Learn_policy_from_data(paths, g, Q, N, Vx_rzns, Vy_rzns, num_of_paths=dt_size, num_actions =num_actions, ALPHA=ALPHA, method = method, num_passes = num_passes)
-                    plot_max_Qvalues(Q, policy, X, Y)
+                    print("Learned Policy from data")
+
                     #Save policy
                     Policy_path = dir_path + 'Policy_01'
+                    writePolicytoFile(policy, Policy_path)
+                    print("Policy written to file")
+
+                    # plot_max_Qvalues(Q, policy, X, Y, fpath = dir_path, fname = 'max_Qvalues', showfig = True)
+                    print("Plotted max Qvals")
 
                     #Plot Policy
                     # Fig_policy_path = dir_path+'Fig_'+ 'Policy01'+'.png'
@@ -87,9 +95,12 @@ def run_QL(setup_grid_params, QL_params, QL_path):
                     QL_params = policy, Q, init_Q, label_data, dir_path
                     plot_learned_policy(g, QL_params = QL_params)
                     # plot_all_policies(g, Q, policy, init_Q, label_data, full_file_path= Fig_policy_path )
-
-                    writePolicytoFile(policy, Policy_path)
+                    
+                    #plot max_delQ
                     plot_max_delQs(max_delQ_list_1, filename=dir_path + 'delQplot1')
+                    print("plotted learned policy and max_delQs")
+
+
                 else:
                     if with_guidance == True:
                         policy = initialise_policy_from_initQ(Q)
@@ -97,28 +108,29 @@ def run_QL(setup_grid_params, QL_params, QL_path):
                         policy = initialise_policy(g)
 
 
-                #Times and Trajectories based on data and/or guidance
-                t_list1, G0_list1, bad_count1 = plot_exact_trajectory_set(g, policy, X, Y, Vx_rzns, Vy_rzns, exp,
-                                                                       fname=dir_path + 'Trajectories_before_exp')
+                # Times and Trajectories based on data and/or guidance
+                t_list1, G0_list1, bad_count1 = plot_exact_trajectory_set(g, policy, X, Y, Vx_rzns, Vy_rzns,
+                                                                       fpath = dir_path, fname = 'Trajectories_before_exp')
+                print("plotted exacte trajectory set")
 
-                #Learn from Experience
+                # Policy Refinement Step: Learn from Experience
                 Q, policy, max_delQ_list_2 = Q_learning_Iters(Q, N, g, policy, Vx_rzns, Vy_rzns, alpha=ALPHA, QIters=QL_Iters,
-                                              eps_0=eps_0)
-
+                                              eps_0=eps_0, eps_dec_method = eps_dec_method)
+                print("Policy refined")
+            
                 #save Updated Policy
                 Policy_path = dir_path + 'Policy_02'
                 # Fig_policy_path = dir_path + 'Fig_' + 'Policy02' + '.png'
 
                 writePolicytoFile(policy, Policy_path)
                 # plot_learned_policy(g, Q, policy, init_Q, label_data, Iters_after_update=QL_Iters, full_file_path= Fig_policy_path )
+                print("Refined policy written to file")
 
                 #plots after Experince
                 plot_max_delQs(max_delQ_list_2, filename= dir_path + 'delQplot2' )
-                t_list2, G0_list2, bad_count2 = plot_exact_trajectory_set(g, policy, X, Y, Vx_rzns, Vy_rzns, exp,
-                                                            fname=dir_path + 'Trajectories_after_exp')
-
-
-
+                t_list2, G0_list2, bad_count2 = plot_exact_trajectory_set(g, policy, X, Y, Vx_rzns, Vy_rzns,
+                                                            fpath = dir_path, fname =  'Trajectories_after_exp')
+                print("plotted max delQs and exact traj set AFTER REFINEMENT")
 
 
                 #Results to be printed
@@ -136,6 +148,9 @@ def run_QL(setup_grid_params, QL_params, QL_path):
                 if QL_Iters!=0:
                     bad_count1 = (bad_count1, str(bad_count1*100/dt_size)+'%')
                     bad_count2 = (bad_count2, str(bad_count2*100/dt_size) + '%')
+
+                t_end_case = time.time()
+                case_runtime = round( (t_end_case - t_start_case) / 60, 2 ) #mins
 
                 #Print results to file
                 str_Results1 = ['avg_time1','std_time1', 'bad_count1', 'avg_G01']
@@ -181,10 +196,24 @@ def run_QL(setup_grid_params, QL_params, QL_path):
                 print(G0_list2, file=outputfile)
                 outputfile.close()
 
+                output_paramaters_ith_case = [exp_num, method, num_actions, nt, dt, F, startpos, endpos, eps_0, ALPHA, eps_dec_method, N_inc, dt_size, with_guidance, init_Q, num_passes, QL_Iters,
+                                                avg_time1, std_time1, avg_G01, bad_count1, avg_time2, std_time2, avg_G02, bad_count2, case_runtime ]
+                # Exp No	Method	Num_actions	nt	dt	F	start_pos	end_pos	Eps_0	ALPHA	dt_size_(train_size)	V[start_pos]	Mean_Time_over_5k	Variance_Over_5K	Bad Count	DP_comput_time	Mean_Glist
+                # useless line now since append summary is done here itself
+                output_parameters_all_cases.append(output_paramaters_ith_case) 
 
-                end = time.time()
-                time_taken = round(end -start,2)
+                append_summary_to_summaryFile( join(ROOT_DIR, 'Experiments/Exp_summary_QL.csv'),  output_paramaters_ith_case)
+
+                RUN_QL_elpased_time = round((time.time() - t_start_RUN_QL)/60, 2)
                 #Terminal Print
-                print('time_taken= ', time_taken, 's', end="\n" * 3)
+                print('Case_runtime= ', case_runtime)
+                print('RUN_QL_elpased_time= ', RUN_QL_elpased_time, ' mins', end="\n" * 3)
 
-                end = start
+    t_end_RUN_QL = time.time()
+    RUN_QL_runtime = round((t_end_RUN_QL - t_start_RUN_QL)/60, 2)
+    print("RUN_QL_runtime: ", RUN_QL_runtime, " mins")
+
+    return output_parameters_all_cases
+
+
+            

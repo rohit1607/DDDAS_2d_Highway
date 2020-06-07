@@ -385,9 +385,10 @@ def plot_learned_policy(g, DP_params = None, QL_params = None,  showfig = False)
         plt.quiver(xtr, ytr, ax_list, ay_list)
         ax1.scatter(g.xs[g.start_state[2]], g.ys[g.ni - 1 - g.start_state[1]], c='g')
         ax1.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], c='r')
+
+        fig1.savefig(full_file_path + '_policy_plot.png', dpi=300)
         if showfig == True:
             plt.show()
-        fig1.savefig(full_file_path + '_policy_plot.png', dpi=300)
 
 
 
@@ -481,13 +482,16 @@ def plot_all_policies(g, Q, policy, init_Q , label_data, showfig = False, Iters_
     return
 
 
-def plot_max_Qvalues(Q,policy, XP,YP):
+def plot_max_Qvalues(Q, policy, XP, YP, fpath, fname, showfig = False):
+    print("--- in plot_functions.plot_max_Qvalues---")
+    # get grid size
     m,n = XP.shape
-    Z=np.zeros((m,n))
+    Z = np.zeros((m,n))
+
     for s in Q.keys():
         a = policy[s]
-        # t,i,j = s
-        i,j =s
+        t,i,j = s
+        # i,j =s
         Z[i,j]= Q[s][a]
 
     fig = plt.figure()
@@ -496,12 +500,17 @@ def plot_max_Qvalues(Q,policy, XP,YP):
     mycmap = plt.get_cmap('coolwarm')
 
     ax.plot_surface(XP, YP, Z, cmap=mycmap, linewidth=0, antialiased=False)
-    plt.show()
+
+    if showfig == True:
+        plt.show()
+    # TODO: see if 3d plot can be saved. low prioirty
+    # plt.savefig(join(fpath,fname))
 
 
 
 def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fname='Trajectories'):
     # time calculation and state trajectory
+    print("--- in plot_functions.plot_exact_trajectory_set---")
     fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(1, 1, 1)
     # set grid
@@ -531,6 +540,7 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fnam
     G_list=[]
     traj_list = []
     for rzn in range(n_rzn):
+        # print("rzn: ", rzn)
         g.set_state(g.start_state)
         dont_plot =False
         # t = 0
@@ -544,9 +554,11 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fnam
         a = policy[g.current_state()]
         xtr.append(g.x)
         ytr.append(g.y)
-
+        loop_count = 0
         # while not g.is_terminal() and g.if_within_actionable_time() and g.current_state:
+        # print("__CHECK__ t, i, j")
         while True:
+            loop_count += 1
             r = g.move_exact(a, vStream_x[rzn, i, j], vStream_y[rzn, i, j])
             G = G + r
             (t, i, j) = g.current_state()
@@ -556,25 +568,41 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fnam
 
             if g.if_edge_state((i,j)):
                 bad_count += 1
-                dont_plot=True
+                # dont_plot=True
                 break
 
-            if (not g.is_terminal()):
+            if (not g.is_terminal()) and  g.if_within_actionable_time():
                 a = policy[g.current_state()]
+            elif g.is_terminal():
+                break
             else:
+            #  i.e. not terminal and not in actinable time.
+            # already checked if ternminal or not. If not terminal 
+            # if time reaches nt ie not within actionable time, then increment badcount and Dont plot
+                bad_count+=1
+                bad_flag=True
+                # dont_plot=True
                 break
 
-            if t > g.ni * c_ni: #if trajectory goes haywire, dont plot it.
-                bad_count+=1
-                dont_plot=True
+            #Debugging measure: additional check to break loop because code gets stuck sometims
+            if loop_count > g.ni * c_ni:
+                print("t: ", t)
+                print("g.current_state: ", g.current_state())
+                print("xtr: ",xtr)
+                print("ytr: ",ytr)
                 break
+
+
+            # if t > g.ni * c_ni: #if trajectory goes haywire, dont plot it.
+            #     bad_count+=1
+            #     dont_plot=True
+            #     break
 
         if dont_plot==False:
             plt.plot(xtr, ytr)
             traj_list.append((xtr,ytr))
             t_list.append(t)
             G_list.append(G)
-
         #ADDED for trajactory comparison
         else:
             traj_list.append(None)

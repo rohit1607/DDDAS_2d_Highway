@@ -4,11 +4,15 @@ from os import getcwd, makedirs
 from os.path import join, exists
 from utils.custom_functions import createFolder, append_summary_to_summaryFile
 from QL.TQLearn_RUNNER import run_QL
-from definition import ROOT_DIR
+from definition import ROOT_DIR, threshold
+import argparse
 
-threshold = 1e-3
+# threshold = 1e-3
+
+
 dir = ''
-
+# output_path = create_new_dir()
+output_file = '_'
 
 def get_dir_name(exp_num):
     global dir
@@ -46,8 +50,7 @@ def append_params_to_summary(exp_summary, input_params, output_params):
     return exp_summary
 
 
-# output_path = create_new_dir()
-output_file = '_'
+
 
 def run_Experiment(DP = None, QL = None):
     """
@@ -84,7 +87,7 @@ def run_Experiment(DP = None, QL = None):
         input_params.append(prob_file)
 
         exp_summary = append_params_to_summary(exp_summary, input_params, output_params)
-        append_summary_to_summaryFile('Experiments/Exp_summary.csv', exp_summary)
+        append_summary_to_summaryFile( join(ROOT_DIR,'Experiments/Exp_summary_DP.csv'), exp_summary )
         print("In Runner: Executing DP Finished!!")
 
     # Run QL
@@ -93,29 +96,45 @@ def run_Experiment(DP = None, QL = None):
 
         QL_params = QL
         createFolder(QL_path)
-        run_QL(setup_grid_params, QL_params, QL_path)
+        output_parameters_all_cases = run_QL(setup_grid_params, QL_params, QL_path, exp_num)
+
+        # exp_summary is a list of ouput params for a given case- NOW done inside run_QL
+        # for exp_summary in output_parameters_all_cases:
+        #     append_summary_to_summaryFile( join(ROOT_DIR, 'Experiments/Exp_summary_QL.csv'),  exp_summary)
 
         print("In Runner: Executing QL Finished !!")
 
 
+# employ argparse to run code from commanline
+parser = argparse.ArgumentParser(description='Take parameters as input args.')
+parser.add_argument('num_passes', type=int, help='number of passes for learning data from trajectories')
+parser.add_argument('QL_Iters', type=int, help='number of QL iters in regfiniement phase')
+parser.add_argument('eps0_list', metavar='eps0_list', type=float, nargs='+',help='eps0_list')
+args = parser.parse_args()
+
+
+
 # Training_traj_size_list, ALPHA_list, esp0_list, QL_Iters, init_Q, with_guidance = QL_params
+setup_grid_params = setup_grid(num_actions=16, nt = 100)
+# model_file for DP
+model_file = 'GPU_Highway_test4_3D_100nT_a16'
 
-setup_grid_params = setup_grid(num_actions=16, nt = 20, Test_grid=True)
-model_file = 'CPU_testGrid_6_16a'
-
+# Paramerers for QL
 Training_traj_size_list = [5000]
 ALPHA_list = [0.5]
-esp0_list = [0.25]
-
-QL_Iters = 100
+# esp0_list = [0.25, 0.5, 0.75, 1]
+esp0_list = args.eps0_list
+QL_Iters = args.QL_Iters #for refinement
 init_Q = -1e6
 with_guidance = True
 method = 'reverse_order'
-num_passes = 50
-QL_params = [Training_traj_size_list, ALPHA_list, esp0_list, QL_Iters, init_Q, with_guidance, method, num_passes]
+num_passes = args.num_passes
+eps_dec_method = 1
 
-print("Launnching experiment")
+QL_params = [Training_traj_size_list, ALPHA_list, esp0_list, QL_Iters, init_Q, with_guidance, method, num_passes, eps_dec_method]
 
-# run_Experiment(QL = QL_params)
-run_Experiment(DP = [model_file])
+print("Launching experiment")
+
+run_Experiment(QL = QL_params)
+# run_Experiment(DP = [model_file])
 # run_Experiment(DP = [model_file], QL = QL_params)

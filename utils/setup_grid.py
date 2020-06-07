@@ -61,7 +61,7 @@ def setup_grid(num_actions =16, nt = 100, dt =1, F =1, startpos = (79, 49), endp
         X, Y = my_meshgrid(xs, ys)
 
     else:
-        num_rzns = 50
+        num_rzns = 500
         size = 12
         xs = np.arange(size)
         ys = np.arange(size)

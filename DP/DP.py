@@ -111,6 +111,7 @@ def run_DP(setup_grid_params, prob_file, output_file, output_path, threshold = 1
 
     start = time.time()
     #Iterate VI updates
+    print("iter:  itno  del_v_max   flagged_st  time_elapsed_in_mins  ")
     while True:
         countb += 1
         # print("iter: ", countb)
@@ -118,7 +119,7 @@ def run_DP(setup_grid_params, prob_file, output_file, output_path, threshold = 1
         V, del_V_max, flagged_state = value_iteration_update(g, V, Trans_prob)
 
         if countb % 10 == 0:
-            print("iter: ", countb, del_V_max, flagged_state)
+            print("iter: ", countb, del_V_max, flagged_state, (time.time() - start) / 60)
 
         if del_V_max< threshold:
             print("Converged after ", countb, " iterations")

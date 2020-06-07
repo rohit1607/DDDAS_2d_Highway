@@ -41,7 +41,7 @@ def get_angle_in_0_2pi(angle):
 
 def calculate_reward_const_dt(dt, xs, ys, so, sn, vnet_x, vnet_y, a, degree = False):
 
-    if (so == sn):
+    if (so[1] == sn[1] and so[2] == sn[2]):
         dt_new = dt
     else:
         ni = len(ys)
@@ -352,7 +352,7 @@ def calc_net_velocity(vx, vy, a):
 
 
 def action_angle(traj_theta, actions, vx, vy, F):
-    print()
+
     diff_list = []
     blocked_actions = []
     angle_list = []
@@ -375,8 +375,9 @@ def action_angle(traj_theta, actions, vx, vy, F):
     action = actions[min_id]
     return action
 
-def Calculate_action(state_1,p1,p2, vx, vy, g):
-    traj_theta = get_angle_in_0_2pi(math.atan2(p2[1] - p1[1], p2[0] - p1[0]))
+
+def Calculate_action(state_1, p1, p2, vx, vy, g):
+    traj_theta = get_angle_in_0_2pi(math.atan2(p2[2] - p1[2], p2[1] - p1[1]))
     F = g.actions[0][0]
     action = action_angle(traj_theta, g.actions, vx, vy, F)
     return action
@@ -387,7 +388,10 @@ def initialise_guided_Q_N(g, init_Qval, guiding_Qval,  init_Nval):
     N = {}
     end_i, end_j = g.endpos
     # p2 = (None, g.xs[end_j], g.ys[g.ni - 1 - end_i])
-    p2 = (g.xs[end_j], g.ys[g.ni - 1 - end_i])
+    #take p2 to be the end point, in order to get action that leads to the end point
+    p2 = (None, g.xs[end_j], g.ys[g.ni - 1 - end_i])
+    #Here vx and vys are initialised to zero. this will just make 
+    # the action heading (not net movement direction) towards endpoint
     Vx = Vy = np.zeros((len(g.xs), len(g.ys)))
 
 
@@ -395,9 +399,9 @@ def initialise_guided_Q_N(g, init_Qval, guiding_Qval,  init_Nval):
         Q[s] = {}
         N[s] = {}
         g.set_state(s)
-        # p1 = (None, g.x, g.y)
-        p1 = (g.x, g.y)
-        m, n= s
+        p1 = (None, g.x, g.y)
+        # p1 = (g.x, g.y)
+        t, m, n= s
         targeting_action = Calculate_action(s, p1, p2, Vx[m,n], Vy[m,n],  g)
 
         for a in g.actions:
@@ -472,7 +476,7 @@ def interpolate_to_XP_grid(XU, YU, U, XP, YP):
 
 
 def append_summary_to_summaryFile(summary_file, summary_data):
-    myFile = open('Experiments/Exp_summary.csv', 'a')
+    myFile = open(summary_file, 'a')
     with myFile:
        writer = csv.writer(myFile)
        writer.writerows([summary_data])

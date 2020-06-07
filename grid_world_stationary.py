@@ -66,9 +66,13 @@ class Grid:
 
 
     # MAY NEED TO CHANGE DEFINITION
-    def is_terminal(self):
+    def is_terminal(self, query_s = None):
         # return self.actions[state]==None
-        return (self.current_pos() == self.endpos)
+        if query_s == None:
+            return (self.current_pos() == self.endpos)
+        else:
+            t, i, j = query_s
+            return((i,j) == self.endpos)
 
     def move_exact(self, action, Vx, Vy):
         r = 0
@@ -190,15 +194,21 @@ class Grid:
         j = s[2]
         return (j <= (self.nj) - 1 and j >= 0 and i <= (self.ni) - 1 and i >= 0 and t <= (self.nt) - 1 and t >= 0)
 
-    def if_edge_state(self, pos):
+    def if_edge_state(self, pos_or_state):
         """
         returns True if state is at the edge
         :param pos:
         :return:
         """
-
-        i = pos[0]
-        j = pos[1]
+        if len(pos_or_state)==2:
+            i = pos_or_state[0]
+            j = pos_or_state[1]
+        elif len(pos_or_state)==3:
+            t = pos_or_state[0]
+            i = pos_or_state[1]
+            j = pos_or_state[2]
+        else:
+            assert ( len(pos_or_state)==2 or len(pos_or_state)==3 ), "Wrong input to if_edge_state()"
         if (i == 0) or (i == self.ni - 1) or (j == 0) or (j == self.nj - 1):
             return True
         else:

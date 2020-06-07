@@ -8,30 +8,36 @@ from definition import N_inc
 
 
 def Run_Q_learning_episode(g, Q, N, ALPHA, Vx, Vy, eps):
+    """
+    Runs a general Q learning episode in the kth realisation environment.
+    """
     # print()
     # print("new episode")
 
     s1 = g.start_state
-    i,j =s1
+    t, i, j = s1
     g.set_state(s1)
-    policy=None
-    a1 = stochastic_action_eps_greedy(policy, s1, g, eps, Q=Q)
+    dummy_policy = None   #stochastic_action_eps_greedy() here, uses Q. so policy is ingnored anyway
+    # a1 = stochastic_action_eps_greedy(policy, s1, g, eps, Q=Q)
     count = 0
     max_delQ = 0
 
     # while not g.is_terminal() and g.if_within_TD_actionable_time():
-    while not g.if_edge_state((s1)) and g.if_within_actionable_time():
+    while not g.is_terminal(s1) and not g.if_edge_state(s1) and g.if_within_actionable_time():
         """Will have to change this for general time"""
+        
+        t, i, j = s1
+        a1 = stochastic_action_eps_greedy(dummy_policy, s1, g, eps, Q=Q)
         r = g.move_exact(a1, Vx[i,j], Vy[i,j])
         s2 = g.current_state()
         # if g.is_terminal() or (not g.if_within_actionable_time()):
+
         alpha = ALPHA / N[s1][a1]
         N[s1][a1] += N_inc
 
-        #maxQsa = 0 if next state is a terminal state
+        #maxQsa = 0 if next state is a terminal state/edgestate/outside actionable time
         max_q_s2_a2= 0
-        # if (s2[1],s2[2])!=g.endpos:
-        if s2 != g.endpos and not g.if_edge_state(s2):
+        if not g.is_terminal(s2) and not g.if_edge_state(s2) and g.if_within_actionable_time():
             a2, max_q_s2_a2 = max_dict(Q[s2])
 
         old_qsa = Q[s1][a1]
@@ -43,37 +49,52 @@ def Run_Q_learning_episode(g, Q, N, ALPHA, Vx, Vy, eps):
         #action for next iteration
         # if (s2[1], s2[2]) != g.endpos:
 
-
         # if (s2[0], s2[1]) != g.endpos:
-        if s2 != g.endpos and not g.if_edge_state(s2):
-            a1 = stochastic_action_eps_greedy(policy, s2, g, eps, Q=Q)
-        else:
-            break
+        # if s2 != g.endpos and not g.if_edge_state(s2):
+        # if not g.is_terminal(s2) and not g.if_edge_state(s2) and g.if_within_actionable_time():
+        #     a1 = stochastic_action_eps_greedy(policy, s2, g, eps, Q=Q)
+        # else:
+        #     break
 
         s1 = s2
-        i,j = s1
+        # t, i, j = s1
 
     return Q, N, max_delQ
 
+#eps_dec_method 1
+def f_1_pt05(qiter, QIters, eps_0):
+    # at qiter = 0, f = 1, eps = eps0
+    # at qiter = Qiter, f = 20, eps= 0.05* eps0
+    return eps_0 / ( (19.0 * qiter/QIters) + 1 ) 
 
-def Q_learning_Iters(Q, N, g, policy, vx_rlzns, vy_rlzns, alpha = 0.5, QIters=10000, stepsize=1000, post_train_size = 1000, eps_0=0.5):
+#eps_dec_method 2
+def f_1_pt5(qiter, QIters, eps_0):
+    return eps_0 / ( (1.0 * qiter/QIters) + 1 ) 
+
+def Q_learning_Iters(Q, N, g, policy, vx_rlzns, vy_rlzns, alpha = 0.5, QIters=10000, stepsize=1000, post_train_size = 1000, eps_0=0.5, eps_dec_method = 1):
 
     max_delQ_list=[]
-    t=1
+    # t=1
     for k in range(QIters):
         # alpha = 1/(k+1)
         # if k%(QIters/500)==0:
         #     t+=0.04
-        t+=1/QIters
-        eps = eps_0/t
+        # eps goes from eps0 to its half
+        # t += 1/QIters
+        if eps_dec_method == 1:
+            eps = f_1_pt05(k, QIters, eps_0)
+        else:
+            eps =f_1_pt5(k, QIters, eps_0)
 
         if k%500==0:
             print("Qlearning Iters: iter, eps =",k, eps)
 
+        # if QIters are large then, keep looping over rzns
+        # TODO: HCparam
         rzn = k%5000
         Vx = vx_rlzns[rzn,:,:]
         Vy = vy_rlzns[rzn,:,:]
-        Q, N, max_delQ = Run_Q_learning_episode(g, Q, N,alpha, Vx, Vy, eps)
+        Q, N, max_delQ = Run_Q_learning_episode(g, Q, N, alpha, Vx, Vy, eps)
         if k%500==0:
             max_delQ_list.append(max_delQ)
 
@@ -90,6 +111,7 @@ def Q_learning_Iters(Q, N, g, policy, vx_rlzns, vy_rlzns, alpha = 0.5, QIters=10
 # output_path, exp_num = create_new_dir()          #dirs Exp/1, Exp/2, ...
 # DP_path = join(output_path,'DP')                 #dirs Exp/1/DP
 # QL_path = join(output_path,'QL')
+
 
 
 def test_QL(QIters=10000):
