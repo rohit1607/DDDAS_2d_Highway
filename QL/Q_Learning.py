@@ -3,7 +3,7 @@ from utils.custom_functions import *
 from utils.plot_functions import plot_exact_trajectory, plot_learned_policy
 from os.path import join
 from os import getcwd
-from definition import N_inc
+# from definition import N_inc
 # ALPHA =0.1
 
 
@@ -71,9 +71,16 @@ def f_1_pt05(qiter, QIters, eps_0):
 def f_1_pt5(qiter, QIters, eps_0):
     return eps_0 / ( (1.0 * qiter/QIters) + 1 ) 
 
-def Q_learning_Iters(Q, N, g, policy, vx_rlzns, vy_rlzns, alpha = 0.5, QIters=10000, stepsize=1000, post_train_size = 1000, eps_0=0.5, eps_dec_method = 1):
+def Q_learning_Iters(Q, N, g, policy, vx_rlzns, vy_rlzns, train_id_list, n_inc, alpha = 0.5, QIters=10000, stepsize=1000, post_train_size = 1000, eps_0=0.5, eps_dec_method = 1):
 
+    global N_inc
+    N_inc = n_inc
+    
+    print("$$$$$$$$$$$ CHECk in Q_Learning: N_inc = ", N_inc)
     max_delQ_list=[]
+    train_id_list_list = list(train_id_list)
+    dt_size = len(train_id_list_list)
+    print("-------- CHECK: train_id_list_list: ", dt_size)
     # t=1
     for k in range(QIters):
         # alpha = 1/(k+1)
@@ -87,11 +94,12 @@ def Q_learning_Iters(Q, N, g, policy, vx_rlzns, vy_rlzns, alpha = 0.5, QIters=10
             eps =f_1_pt5(k, QIters, eps_0)
 
         if k%500==0:
-            print("Qlearning Iters: iter, eps =",k, eps)
+            print("Qlearning Iters: iter, eps =", k, eps)
 
         # if QIters are large then, keep looping over rzns
-        # TODO: HCparam
-        rzn = k%5000
+        # Loop over rzns in train_id_list_list
+        # TODO:xxDone: HCparam
+        rzn = train_id_list_list[k%dt_size]
         Vx = vx_rlzns[rzn,:,:]
         Vy = vy_rlzns[rzn,:,:]
         Q, N, max_delQ = Run_Q_learning_episode(g, Q, N, alpha, Vx, Vy, eps)

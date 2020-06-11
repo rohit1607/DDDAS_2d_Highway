@@ -1,5 +1,5 @@
 import itertools
-from utils.custom_functions import calculate_reward_const_dt
+from utils.custom_functions import calculate_reward_const_dt, get_minus_dt
 import numpy as np
 import math
 
@@ -35,7 +35,8 @@ class Grid:
 
         self.r_outbound = -100
         self.r_terminal = 100
-        self.r_otherwise = calculate_reward_const_dt
+        # self.r_otherwise = calculate_reward_const_dt
+        self.r_otherwise = get_minus_dt
         self.reward_structure = ['oubound_penalty = '+ str(self.r_outbound), 'Terminal_Reward =' + str(self.r_terminal), 'General_reward: ' + self.r_otherwise.__name__]
 
     # Rewards and Actions to be dictionaries
@@ -129,7 +130,8 @@ class Grid:
                     r += self.r_outbound
 
             s_new = self.current_state()
-            r += self.r_otherwise(self.dt, self.xs, self.ys, s0, s_new, vnetx, vnety, action)
+            # r += self.r_otherwise(self.dt, self.xs, self.ys, s0, s_new, vnetx, vnety, action)
+            r += self.r_otherwise(self.dt)
 
             if self.is_terminal():
                 r += self.r_terminal

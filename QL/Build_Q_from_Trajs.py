@@ -1,10 +1,11 @@
-from utils.custom_functions import Calculate_action, max_dict, initialise_policy
+from utils.custom_functions import Calculate_action, max_dict, initialise_policy, picklePolicy
 import numpy as np
-from definition import N_inc, Sampling_interval
+from definition import Sampling_interval
 import random
 from _collections import OrderedDict
 
 SAMPLING_Interval = Sampling_interval
+max_delQ_threshold = 0.1
 
 # Helper func to compute cell state of pt in trajectory and add it to dic
 def compute_cell(grid, s):
@@ -33,9 +34,17 @@ def within_same_spatial_cell(grid , point1, point2):
     else:
         return 0
 
-def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, num_of_paths, num_actions ):
+def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, train_path_ids, num_actions ):
     exp_buffer_all_trajs = []
-    for k in range(num_of_paths):
+    # print("$$$ CHECK  train_path_ids: ", train_path_ids)
+    
+    s_next_badcount = 0 #for counting how many times we dont reach terminal state
+    double_count = 0
+    s_next_bad_idlist = []
+    doouble_idlist =[]
+    coord_traj_5k =[]
+    state_traj_5k =[]
+    for k in train_path_ids:
         exp_buffer_kth_traj = []
         Vxt = Vx_rzns[k, :, :]  #kth rzn velocity data
         Vyt = Vy_rzns[k, :, :]
@@ -45,9 +54,9 @@ def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, nu
         s_t = int(0)
         coord_traj = []
         state_traj = []
-        for i in range(0, len(trajectory) - (sampling_interval), sampling_interval):
+        for i in range(0, len(trajectory), sampling_interval):
             coord_traj.append((s_t, trajectory[i][0], trajectory[i][1]))  #add first coordinate from the trajectory to coord_traj
-            s_i, s_j = compute_cell(grid, trajectory[0])         # compute indices corrsponding to first coord
+            s_i, s_j = compute_cell(grid, trajectory[i])         # compute indices corrsponding to first coord
             state_traj.append((s_t, s_i, s_j))  #add first index to the list continating trajectory as state indices
             s_t += 1
 
@@ -79,35 +88,81 @@ def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, nu
         #  reverse order now to save it from doing so while leaning through "reverse" method
         state_traj.reverse()
         coord_traj.reverse()
-
+        
+        coord_traj_5k.append(coord_traj)
+        state_traj_5k.append(state_traj)
+        
         #build buffer
         # print("check warning, rzn: ", k)
         # print("s1, p1, p2, Vxt, Vyt")
         for i in range(len(state_traj)-1): # till len -1 because there is i+1 inside the loop
             s1=state_traj[i+1]
-            s2=state_traj[i]
-            t ,m, n = s1
-            # m, n = s1
-            #vx=Vxt[t,i,j]
-            # TODO: the below is only valid as this is a stationary vel feild. hence, t idx not needed
-            vx = Vxt[m, n]
-            vy = Vyt[m, n]
+            s2=state_traj[i] #IMP: perhaps only used as dummy
+            if not (grid.is_terminal(s1)):
+                t ,m, n = s1
+                # m, n = s1
+                #vx=Vxt[t,i,j]
+                # TODO: the below is only valid as this is a stationary vel feild. hence, t idx not needed
+                vx = Vxt[m, n]
+                vy = Vyt[m, n]
 
-            p1=coord_traj[i+1]
-            p2=coord_traj[i]
-            """COMMENTING THIS STATEMENT BELOW"""
-            # if (s1[1],s1[2])!=(s2[1],s2[2]):
-            # print(s1,p1,p2, vx, vy)
-            a1 = Calculate_action(s1,p1,p2, vx, vy, grid)
-            r1 = grid.move_exact(a1, vx, vy)
-            exp_buffer_kth_traj.append([s1, a1, r1, s2])
+                p1=coord_traj[i+1]
+                p2=coord_traj[i]
+                grid.set_state(s1, xcoord=p1[1], ycoord=p1[2])
+
+                """COMMENTING THIS STATEMENT BELOW"""
+                # if (s1[1],s1[2])!=(s2[1],s2[2]):
+                # print(s1,p1,p2, vx, vy)
+                a1 = Calculate_action(s1, s2, p1, p2, vx, vy, grid, coord_traj_theta= False)
+                r1 = grid.move_exact(a1, vx, vy)
+                s_next = grid.current_state()
+                # if grid.current_state() != s2:
+                #     print("**** mismatch: ",s1, a1, s2, grid.current_state())
+                if i == 0:
+                    if grid.is_terminal(s_next):
+                        s_next_badcount += 1
+                        s_next_bad_idlist.append((k,s1,a1,r1,s_next,s2))
+                exp_buffer_kth_traj.append([s1, a1, r1, s_next])
+            else:
+                double_count += 1
+                doouble_idlist.append((k, s1, s2))
+
+        # if k == 0:
+        #     # print("$$$$ CHECk state_traj: ", state_traj)
+        #     pass
+        #     # print("$$$$ CHECk 0th buffer: ")
+        #     # for sars in exp_buffer_kth_traj:
+        #     #     print(sars)
 
         #append kth-traj-list to master list
         exp_buffer_all_trajs.append(exp_buffer_kth_traj)
 
+    # picklePolicy(doouble_idlist, 'doouble_idlist' )
+    # picklePolicy( s_next_bad_idlist, 's_next_bad_idlist')
+    # picklePolicy( coord_traj_5k, 'coord_traj_5k')
+    # picklePolicy( state_traj_5k,'state_traj_5k ')
+    print("$$$$$$$ s_next_badcount: ", s_next_badcount)
+    print("$$$$$$$ double_count: ", double_count)
+    print("$$$$$ dlen(train_path_ids) ", len(train_path_ids))
+
     return exp_buffer_all_trajs
 
 
+def Q_update(Q, N, max_delQ, sars, ALPHA, grid):
+    s1, a1, r1, s2 = sars
+    if not grid.is_terminal(s1):     # if (s1[1], s1[2]) != grid.endpos:
+        N[s1][a1] += N_inc
+        alpha1 = ALPHA / N[s1][a1]
+        q_s1_a1 = r1
+        if not grid.is_terminal(s2): # if (s2[1], s2[2]) != grid.endpos:
+            _, val = max_dict(Q[s2])
+            q_s1_a1 = r1 + val
+        old_qsa = Q[s1][a1]
+        Q[s1][a1] += alpha1 * (q_s1_a1 - Q[s1][a1])
+        delQ = np.abs(old_qsa - Q[s1][a1])
+        if delQ > max_delQ:
+            max_delQ = delQ
+    return Q, N, max_delQ
 
 
 def learn_Q_from_exp_buffer(grid, exp_buffer, Q, N, ALPHA, method='reverse_order', num_passes =1):
@@ -122,22 +177,11 @@ def learn_Q_from_exp_buffer(grid, exp_buffer, Q, N, ALPHA, method='reverse_order
     :param num_passes:
     :return:
     """
-
-    def Q_update(Q, N, max_delQ, sars):
-        s1, a1, r1, s2 = sars
-        if not grid.is_terminal(s1):     # if (s1[1], s1[2]) != grid.endpos:
-            N[s1][a1] += N_inc
-            alpha1 = ALPHA / N[s1][a1]
-            q_s1_a1 = r1
-            if not grid.is_terminal(s2): # if (s2[1], s2[2]) != grid.endpos:
-                _, val = max_dict(Q[s2])
-                q_s1_a1 = r1 + val
-            old_qsa = Q[s1][a1]
-            Q[s1][a1] += alpha1 * (q_s1_a1 - Q[s1][a1])
-            delQ = np.abs(old_qsa - Q[s1][a1])
-            if delQ > max_delQ:
-                max_delQ = delQ
-        return Q, N, max_delQ
+    # print("$$$$ CHECK: ")
+    # for kth_traj_buffer in exp_buffer:
+    #     print("* *  * *  * *")
+    #     for i in range(3):
+    #         print(kth_traj_buffer[i])
 
     if not (method == 'reverse_order' or method == 'iid'):
         print("No such method learning Q values from traj")
@@ -152,13 +196,13 @@ def learn_Q_from_exp_buffer(grid, exp_buffer, Q, N, ALPHA, method='reverse_order
             max_delQ = 0
             for kth_traj_buffer in exp_buffer:
                 for sars in kth_traj_buffer:
-                    Q, N, max_delQ = Q_update(Q, N, max_delQ, sars)
+                    Q, N, max_delQ = Q_update(Q, N, max_delQ, sars, ALPHA, grid)
 
             max_delQ_list.append(max_delQ)
             print('max_delQ= ',max_delQ)
             # print("Q[start] = ", Q[grid.start_state])
             print('Q[s]: best a, val =', max_dict(Q[grid.start_state]))
-            if max_delQ < 1:
+            if max_delQ < max_delQ_threshold:
                 print("Qs converged")
                 break
 
@@ -180,16 +224,16 @@ def learn_Q_from_exp_buffer(grid, exp_buffer, Q, N, ALPHA, method='reverse_order
             print('max_delQ= ', max_delQ)
             # print("Q[start] = ", Q[grid.start_state])
             print('Q[s]: best a, val =', max_dict(Q[grid.start_state]))
-            if max_delQ < 1:
+            if max_delQ < max_delQ_threshold:
                 print("Qs converged")
                 break
 
     return Q, max_delQ_list
 
 
-def learn_Q_from_trajs(paths, grid, Q, N,  Vx_rzns, Vy_rzns, num_of_paths, num_actions, ALPHA, sampling_interval, method= 'reverse_order', num_passes= 1):
+def learn_Q_from_trajs(paths, grid, Q, N,  Vx_rzns, Vy_rzns, train_path_ids, num_actions, ALPHA, sampling_interval, method= 'reverse_order', num_passes= 1):
     #build experience buffer
-    exp_buffer = build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, num_of_paths, num_actions)
+    exp_buffer = build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, train_path_ids, num_actions)
     print(" Built Experience Buffer")
 
     # use experience buffer to learn Q values
@@ -199,13 +243,16 @@ def learn_Q_from_trajs(paths, grid, Q, N,  Vx_rzns, Vy_rzns, num_of_paths, num_a
 
 
 
-def Learn_policy_from_data(paths, g, Q, N, Vx_rzns, Vy_rzns, num_of_paths=10, num_actions =36, ALPHA=0.5, method = 'reverse_order', num_passes = 1):
+def Learn_policy_from_data(paths, g, Q, N, Vx_rzns, Vy_rzns, train_path_ids, n_inc, num_actions = 36, ALPHA=0.5, method = 'reverse_order', num_passes = 1):
 
+    global N_inc
+    N_inc = n_inc
+    print("$$$$$$$$$$$ CHECk in buildQ: N_inc = ", N_inc)
 
     sampling_interval = SAMPLING_Interval
-    # Q = EstimateQ_with_parallel_trajs(paths, g, pos_const, sampling_interval, Q, N, Vx, Vy, num_of_paths)
+    # Q = EstimateQ_with_parallel_trajs(paths, g, pos_const, sampling_interval, Q, N, Vx, Vy, train_path_ids)
     # Q, max_Qdel_list= EstimateQ_mids_mids2(paths, g, Q, N, Vx_rzns, Vy_rzns, num_of_paths, num_actions, ALPHA, sampling_interval )
-    Q, max_Qdel_list= learn_Q_from_trajs(paths, g, Q, N, Vx_rzns, Vy_rzns, num_of_paths, num_actions, ALPHA, sampling_interval, method = method, num_passes= num_passes)
+    Q, max_Qdel_list= learn_Q_from_trajs(paths, g, Q, N, Vx_rzns, Vy_rzns, train_path_ids, num_actions, ALPHA, sampling_interval, method = method, num_passes= num_passes)
     #Compute policy
     policy=initialise_policy(g)
     for s in Q.keys():

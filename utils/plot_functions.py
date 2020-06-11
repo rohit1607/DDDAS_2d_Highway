@@ -332,6 +332,7 @@ def plot_learned_policy(g, DP_params = None, QL_params = None,  showfig = False)
     :param policy: Learned policy.
     :param init_Q: initial value for Q. Just like Q, required only for the QL policy plot
     :param label_data: Labels to put on fig. Currently requiered only for QL
+    :param filename: filename to save plot
     """
     # full_file_path = ROOT_DIR
     if DP_params == None and QL_params == None:
@@ -355,40 +356,57 @@ def plot_learned_policy(g, DP_params = None, QL_params = None,  showfig = False)
 
     ax1.grid(which='major', color='#CCCCCC', linestyle='')
     ax1.grid(which='minor', color='#CCCCCC', linestyle='--')
-    xtr=[]
-    ytr=[]
-    ax_list=[]
-    ay_list=[]
 
-
+   
     if QL_params != None:
-        policy, Q, init_Q, label_data, full_file_path = QL_params
+        # empty_list = []
+        # xtr_all_t =[]
+        # ytr_all_t =[]
+        # ax_list_all_t =[]
+        # ay_list_all_t =[]
+        # for i in range(g.nt):
+        #     xtr_all_t.append(empty_list)
+        #     ytr_all_t.append(empty_list)
+        #     ax_list_all_t.append(empty_list)
+        #     ay_list_all_t.append(empty_list)
+        ax_list =[]
+        ay_list = []
+        xtr = []
+        ytr = []
+
+        policy, Q, init_Q, label_data, full_file_path, fname = QL_params
         F, ALPHA, initq, QIters = label_data
         ax1.text(0.1, 9, 'F=(%s)'%F, fontsize=12)
         ax1.text(0.1, 8, 'ALPHA=(%s)'%ALPHA, fontsize=12)
         ax1.text(0.1, 7, 'initq=(%s)'%initq, fontsize=12)
         ax1.text(0.1, 6, 'QIters=(%s)'%QIters, fontsize=12)
+        colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
         for s in Q.keys():
+            t, i, j = s
             # for a in Q[s].keys():
-                # if s[0]==0 and a == policy[s]: # to print policy at time t = 0
+            # if s[t]%2==0: # to print policy at time t = 0
             a = policy[s]
-            if Q[s][a] != init_Q: # to plot policy of only updated states
-                t, i, j = s
+            if not(Q[s][a] == init_Q/2 or Q[s][a] == init_Q): # to plot policy of only updated states
+                # t, i, j = s
                 xtr.append(g.xs[j])
                 ytr.append(g.ys[g.ni - 1 - i])
                 # print("test", s, a_policy)
                 ax, ay = action_to_quiver(a)
                 ax_list.append(ax)
                 ay_list.append(ay)
-                # print(i,j,g.xs[j], g.ys[g.ni - 1 - i], ax, ay)
-
+                    # print(i,j,g.xs[j], g.ys[g.ni - 1 - i], ax, ay)
+        
+        # for t in range(g.nt):
         plt.quiver(xtr, ytr, ax_list, ay_list)
-        ax1.scatter(g.xs[g.start_state[2]], g.ys[g.ni - 1 - g.start_state[1]], c='g')
-        ax1.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], c='r')
 
-        fig1.savefig(full_file_path + '_policy_plot.png', dpi=300)
+        ax1.scatter(g.xs[g.start_state[2]], g.ys[g.ni - 1 - g.start_state[1]], c='g', zorder = -1e5)
+        ax1.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], c='r', zorder = -1e5)
+
+        fig1.savefig(full_file_path + fname + '.png', dpi=300)
         if showfig == True:
             plt.show()
+        plt.cla()
+        plt.close(fig1)
 
 
 
@@ -508,41 +526,79 @@ def plot_max_Qvalues(Q, policy, XP, YP, fpath, fname, showfig = False):
 
 
 
-def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fname='Trajectories'):
+def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, train_id_list, test_id_list, fpath, fname='Trajectories'):
+    """
+    Makes plots across all rzns with different colors for test and train data
+    returns list for all rzns.
+    """
+
     # time calculation and state trajectory
     print("--- in plot_functions.plot_exact_trajectory_set---")
+
+    msize = 15
+    # fsize = 3
+
     fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(1, 1, 1)
+    ax.set_xlim(0,100)
+    ax.set_ylim(0,100)
     # set grid
-    minor_xticks = np.arange(g.xs[0] - 0.5 * g.dj, g.xs[-1] + 2 * g.dj, g.dj)
-    minor_yticks = np.arange(g.ys[0] - 0.5 * g.di, g.ys[-1] + 2 * g.di, g.di)
+    # minor_xticks = np.arange(g.xs[0] - 0.5 * g.dj, g.xs[-1] + 2 * g.dj, g.dj)
+    # minor_yticks = np.arange(g.ys[0] - 0.5 * g.di, g.ys[-1] + 2 * g.di, g.di)
 
-    major_xticks = np.arange(g.xs[0], g.xs[-1] + 2 * g.dj, 5 * g.dj)
-    major_yticks = np.arange(g.ys[0], g.ys[-1] + 2 * g.di, 5 * g.di)
+    # major_xticks = np.arange(g.xs[0], g.xs[-1] + 2 * g.dj, 5 * g.dj)
+    # major_yticks = np.arange(g.ys[0], g.ys[-1] + 2 * g.di, 5 * g.di)
 
-    ax.set_xticks(minor_xticks, minor=True)
-    ax.set_yticks(minor_yticks, minor=True)
-    ax.set_xticks(major_xticks)
-    ax.set_yticks(major_yticks)
+    # ax.set_xticks(minor_xticks, minor=True)
+    # ax.set_yticks(minor_yticks, minor=True)
+    # ax.set_xticks(major_xticks)
+    # ax.set_yticks(major_yticks)
+    # ax.grid(which='major', color='#CCCCCC', linestyle='')
+    # ax.grid(which='minor', color='#CCCCCC', linestyle='--')
+    
+    # plt.scatter(g.xs[st_point[2]], g.ys[g.ni - 1 - st_point[1]], c='g')
+    # plt.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], c='r')
+    # plt.grid()
+    # plt.gca().set_aspect('equal', adjustable='box')
 
-    ax.grid(which='major', color='#CCCCCC', linestyle='')
-    ax.grid(which='minor', color='#CCCCCC', linestyle='--')
+    minor_ticks = [i for i in range(101) if i%20!=0]
+    major_ticks = [i for i in range(0,120,20)]
+
+    ax.set_xticks(minor_ticks, minor=True)
+    ax.set_xticks(major_ticks, minor=False)
+    ax.set_yticks(major_ticks, minor=False)
+    ax.set_yticks(minor_ticks, minor=True)
+
+    ax.grid(b= True, which='both', color='#CCCCCC', axis='both',linestyle = '-', alpha = 0.5)
+    ax.tick_params(axis='both', which='both', labelsize=6)
+
+    ax.set_xlabel('X (Non-Dim)')
+    ax.set_ylabel('Y (Non-Dim)')
+
     st_point= g.start_state
-    plt.scatter(g.xs[st_point[2]], g.ys[g.ni - 1 - st_point[1]], c='g')
-    plt.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], c='r')
-    plt.grid()
+    plt.scatter(g.xs[st_point[1]], g.ys[g.ni - 1 - st_point[0]], marker = 'o', s = msize, color = 'k', zorder = 1e5)
+    plt.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], marker = '*', s = msize*2, color ='k', zorder = 1e5)
     plt.gca().set_aspect('equal', adjustable='box')
+
     plt.quiver(X, Y, vStream_x[0, :, :], vStream_y[0, :, :])
 
     n_rzn,m,n = vStream_x.shape
     bad_count =0
+
     t_list=[]
     G_list=[]
     traj_list = []
     for rzn in range(n_rzn):
         # print("rzn: ", rzn)
+        color = 'r'
+        if rzn in train_id_list:
+            color = 'b'
+        elif rzn in test_id_list:
+            color = 'g'
+
         g.set_state(g.start_state)
         dont_plot =False
+        bad_flag = False
         # t = 0
         G = 0
 
@@ -592,14 +648,16 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fnam
                 print("ytr: ",ytr)
                 break
 
-
             # if t > g.ni * c_ni: #if trajectory goes haywire, dont plot it.
             #     bad_count+=1
             #     dont_plot=True
             #     break
 
         if dont_plot==False:
-            plt.plot(xtr, ytr)
+            plt.plot(xtr, ytr, color = color)
+
+        # if bad flag is True then append None to the list. These nones are counted later
+        if bad_flag == False:   
             traj_list.append((xtr,ytr))
             t_list.append(t)
             G_list.append(G)
@@ -611,7 +669,10 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fnam
 
 
     if fname != None:
-        plt.savefig(join(fpath,fname), dpi=300)
+
+        plt.savefig(join(fpath,fname),bbox_inches = "tight", dpi=200)
+        plt.cla()
+        plt.close(fig)
         print("*** pickling traj_list ***")
         picklePolicy(traj_list, join(fpath,fname))
         print("*** pickled ***")
@@ -621,14 +682,16 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, fpath, fnam
 
 
 def plot_max_delQs(max_delQ_list_1, filename= None ):
-     fig = plt.figure(figsize=(10, 10))
-     ax = fig.add_subplot(1, 1, 1)
-     plt.plot(max_delQ_list_1)
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(1, 1, 1)
+    plt.plot(max_delQ_list_1)
 
-     if filename!= None:
-         plt.savefig(filename, dpi=300)
+    if filename!= None:
+        plt.savefig(filename, dpi=200)
+        plt.cla()
+    plt.close(fig)
 
-     return
+    return
 
 
 def plot_input_trajectory(paths, idx, g, X, Y, vStream_x, vStream_y,
