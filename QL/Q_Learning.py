@@ -78,9 +78,8 @@ def Q_learning_Iters(Q, N, g, policy, vx_rlzns, vy_rlzns, train_id_list, n_inc, 
     
     print("$$$$$$$$$$$ CHECk in Q_Learning: N_inc = ", N_inc)
     max_delQ_list=[]
-    train_id_list_list = list(train_id_list)
-    dt_size = len(train_id_list_list)
-    print("-------- CHECK: train_id_list_list: ", dt_size)
+    dt_size = len(train_id_list)
+    print("-------- CHECK: train_id_list: ", dt_size)
     # t=1
     for k in range(QIters):
         # alpha = 1/(k+1)
@@ -97,9 +96,9 @@ def Q_learning_Iters(Q, N, g, policy, vx_rlzns, vy_rlzns, train_id_list, n_inc, 
             print("Qlearning Iters: iter, eps =", k, eps)
 
         # if QIters are large then, keep looping over rzns
-        # Loop over rzns in train_id_list_list
+        # Loop over rzns in train_id_list
         # TODO:xxDone: HCparam
-        rzn = train_id_list_list[k%dt_size]
+        rzn = train_id_list[k%dt_size]
         Vx = vx_rlzns[rzn,:,:]
         Vy = vy_rlzns[rzn,:,:]
         Q, N, max_delQ = Run_Q_learning_episode(g, Q, N, alpha, Vx, Vy, eps)

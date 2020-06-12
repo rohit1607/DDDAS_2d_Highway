@@ -148,7 +148,7 @@ def build_experience_buffer(grid, Vx_rzns, Vy_rzns, paths, sampling_interval, tr
     return exp_buffer_all_trajs
 
 
-def Q_update(Q, N, max_delQ, sars, ALPHA, grid):
+def Q_update(Q, N, max_delQ, sars, ALPHA, grid, N_inc):
     s1, a1, r1, s2 = sars
     if not grid.is_terminal(s1):     # if (s1[1], s1[2]) != grid.endpos:
         N[s1][a1] += N_inc
@@ -196,7 +196,7 @@ def learn_Q_from_exp_buffer(grid, exp_buffer, Q, N, ALPHA, method='reverse_order
             max_delQ = 0
             for kth_traj_buffer in exp_buffer:
                 for sars in kth_traj_buffer:
-                    Q, N, max_delQ = Q_update(Q, N, max_delQ, sars, ALPHA, grid)
+                    Q, N, max_delQ = Q_update(Q, N, max_delQ, sars, ALPHA, grid, N_inc)
 
             max_delQ_list.append(max_delQ)
             print('max_delQ= ',max_delQ)
@@ -218,7 +218,7 @@ def learn_Q_from_exp_buffer(grid, exp_buffer, Q, N, ALPHA, method='reverse_order
             max_delQ = 0
             for i in idx_list:
                 sars = exp_buffer[i]
-                Q, N, max_delQ = Q_update(Q, N, max_delQ, sars)
+                Q, N, max_delQ = Q_update(Q, N, max_delQ, sars, ALPHA, grid, N_inc)
 
             max_delQ_list.append(max_delQ)
             print('max_delQ= ', max_delQ)
@@ -228,7 +228,7 @@ def learn_Q_from_exp_buffer(grid, exp_buffer, Q, N, ALPHA, method='reverse_order
                 print("Qs converged")
                 break
 
-    return Q, max_delQ_list
+    return Q, N, max_delQ_list
 
 
 def learn_Q_from_trajs(paths, grid, Q, N,  Vx_rzns, Vy_rzns, train_path_ids, num_actions, ALPHA, sampling_interval, method= 'reverse_order', num_passes= 1):
@@ -237,9 +237,9 @@ def learn_Q_from_trajs(paths, grid, Q, N,  Vx_rzns, Vy_rzns, train_path_ids, num
     print(" Built Experience Buffer")
 
     # use experience buffer to learn Q values
-    Q, max_delQ_list = learn_Q_from_exp_buffer(grid, exp_buffer, Q, N, ALPHA, method=method, num_passes = num_passes)
+    Q, N, max_delQ_list = learn_Q_from_exp_buffer(grid, exp_buffer, Q, N, ALPHA, method=method, num_passes = num_passes)
     print("learned Q from Trajs")
-    return Q, max_delQ_list
+    return Q, N, max_delQ_list
 
 
 
@@ -252,14 +252,14 @@ def Learn_policy_from_data(paths, g, Q, N, Vx_rzns, Vy_rzns, train_path_ids, n_i
     sampling_interval = SAMPLING_Interval
     # Q = EstimateQ_with_parallel_trajs(paths, g, pos_const, sampling_interval, Q, N, Vx, Vy, train_path_ids)
     # Q, max_Qdel_list= EstimateQ_mids_mids2(paths, g, Q, N, Vx_rzns, Vy_rzns, num_of_paths, num_actions, ALPHA, sampling_interval )
-    Q, max_Qdel_list= learn_Q_from_trajs(paths, g, Q, N, Vx_rzns, Vy_rzns, train_path_ids, num_actions, ALPHA, sampling_interval, method = method, num_passes= num_passes)
+    Q, N, max_Qdel_list= learn_Q_from_trajs(paths, g, Q, N, Vx_rzns, Vy_rzns, train_path_ids, num_actions, ALPHA, sampling_interval, method = method, num_passes= num_passes)
     #Compute policy
     policy=initialise_policy(g)
     for s in Q.keys():
         newa, _ = max_dict(Q[s])
         policy[s] = newa
 
-    return Q, policy, max_Qdel_list
+    return Q, N,  policy, max_Qdel_list
 
 
 

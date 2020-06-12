@@ -542,24 +542,6 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, train_id_li
     ax = fig.add_subplot(1, 1, 1)
     ax.set_xlim(0,100)
     ax.set_ylim(0,100)
-    # set grid
-    # minor_xticks = np.arange(g.xs[0] - 0.5 * g.dj, g.xs[-1] + 2 * g.dj, g.dj)
-    # minor_yticks = np.arange(g.ys[0] - 0.5 * g.di, g.ys[-1] + 2 * g.di, g.di)
-
-    # major_xticks = np.arange(g.xs[0], g.xs[-1] + 2 * g.dj, 5 * g.dj)
-    # major_yticks = np.arange(g.ys[0], g.ys[-1] + 2 * g.di, 5 * g.di)
-
-    # ax.set_xticks(minor_xticks, minor=True)
-    # ax.set_yticks(minor_yticks, minor=True)
-    # ax.set_xticks(major_xticks)
-    # ax.set_yticks(major_yticks)
-    # ax.grid(which='major', color='#CCCCCC', linestyle='')
-    # ax.grid(which='minor', color='#CCCCCC', linestyle='--')
-    
-    # plt.scatter(g.xs[st_point[2]], g.ys[g.ni - 1 - st_point[1]], c='g')
-    # plt.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], c='r')
-    # plt.grid()
-    # plt.gca().set_aspect('equal', adjustable='box')
 
     minor_ticks = [i for i in range(101) if i%20!=0]
     major_ticks = [i for i in range(0,120,20)]
@@ -588,6 +570,7 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, train_id_li
     t_list=[]
     G_list=[]
     traj_list = []
+
     for rzn in range(n_rzn):
         # print("rzn: ", rzn)
         color = 'r'
@@ -608,6 +591,7 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, train_id_li
         t, i, j = g.start_state
 
         a = policy[g.current_state()]
+
         xtr.append(g.x)
         ytr.append(g.y)
         loop_count = 0
@@ -617,7 +601,8 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, train_id_li
             loop_count += 1
             r = g.move_exact(a, vStream_x[rzn, i, j], vStream_y[rzn, i, j])
             G = G + r
-            (t, i, j) = g.current_state()
+            s = g.current_state()
+            (t, i, j) = s
 
             xtr.append(g.x)
             ytr.append(g.y)
@@ -657,7 +642,7 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, train_id_li
             plt.plot(xtr, ytr, color = color)
 
         # if bad flag is True then append None to the list. These nones are counted later
-        if bad_flag == False:   
+        if bad_flag == False:  
             traj_list.append((xtr,ytr))
             t_list.append(t)
             G_list.append(G)
@@ -675,6 +660,147 @@ def plot_exact_trajectory_set(g, policy, X, Y, vStream_x, vStream_y, train_id_li
         plt.close(fig)
         print("*** pickling traj_list ***")
         picklePolicy(traj_list, join(fpath,fname))
+        print("*** pickled ***")
+
+    return t_list, G_list, bad_count
+
+
+def plot_and_return_exact_trajectory_set_train_data(g, policy, X, Y, vStream_x, vStream_y, train_id_list, fpath, fname='Trajectories'):
+    """
+    Makes plots across all rzns with different colors for test and train data
+    returns list for all rzns.
+    """
+
+    # time calculation and state trajectory
+    print("--- in plot_functions.plot_exact_trajectory_set---")
+
+    msize = 15
+    # fsize = 3
+
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.set_xlim(0,100)
+    ax.set_ylim(0,100)
+
+    minor_ticks = [i for i in range(101) if i%20!=0]
+    major_ticks = [i for i in range(0,120,20)]
+
+    ax.set_xticks(minor_ticks, minor=True)
+    ax.set_xticks(major_ticks, minor=False)
+    ax.set_yticks(major_ticks, minor=False)
+    ax.set_yticks(minor_ticks, minor=True)
+
+    ax.grid(b= True, which='both', color='#CCCCCC', axis='both',linestyle = '-', alpha = 0.5)
+    ax.tick_params(axis='both', which='both', labelsize=6)
+
+    ax.set_xlabel('X (Non-Dim)')
+    ax.set_ylabel('Y (Non-Dim)')
+
+    st_point= g.start_state
+    plt.scatter(g.xs[st_point[1]], g.ys[g.ni - 1 - st_point[0]], marker = 'o', s = msize, color = 'k', zorder = 1e5)
+    plt.scatter(g.xs[g.endpos[1]], g.ys[g.ni - 1 - g.endpos[0]], marker = '*', s = msize*2, color ='k', zorder = 1e5)
+    plt.gca().set_aspect('equal', adjustable='box')
+
+    plt.quiver(X, Y, vStream_x[0, :, :], vStream_y[0, :, :])
+
+    n_rzn,m,n = vStream_x.shape
+    bad_count =0
+
+    t_list=[]
+    G_list=[]
+    traj_list = []
+    sars_traj_list = []
+
+    for rzn in train_id_list:
+        # print("rzn: ", rzn)
+
+        g.set_state(g.start_state)
+        dont_plot =False
+        bad_flag = False
+        # t = 0
+        G = 0
+
+        xtr = []
+        ytr = []
+        sars_traj = []
+
+        s1 = g.start_state
+        t, i, j = s1
+
+        a = policy[g.current_state()]
+
+        xtr.append(g.x)
+        ytr.append(g.y)
+        loop_count = 0
+        # while not g.is_terminal() and g.if_within_actionable_time() and g.current_state:
+        # print("__CHECK__ t, i, j")
+        while True:
+            loop_count += 1
+            r = g.move_exact(a, vStream_x[rzn, i, j], vStream_y[rzn, i, j])
+            G = G + r
+            s2 = g.current_state()
+            (t, i, j) = s2
+
+            sars_traj.append((s1, a, r, s2))
+            xtr.append(g.x)
+            ytr.append(g.y)
+
+            s1 = s2 #for next iteration of loop
+            if g.if_edge_state((i,j)):
+                bad_count += 1
+                # dont_plot=True
+                break
+
+            if (not g.is_terminal()) and  g.if_within_actionable_time():
+                a = policy[g.current_state()]
+            elif g.is_terminal():
+                break
+            else:
+            #  i.e. not terminal and not in actinable time.
+            # already checked if ternminal or not. If not terminal 
+            # if time reaches nt ie not within actionable time, then increment badcount and Dont plot
+                bad_count+=1
+                bad_flag=True
+                # dont_plot=True
+                break
+
+            #Debugging measure: additional check to break loop because code gets stuck sometims
+            if loop_count > g.ni * c_ni:
+                print("t: ", t)
+                print("g.current_state: ", g.current_state())
+                print("xtr: ",xtr)
+                print("ytr: ",ytr)
+                break
+
+            # if t > g.ni * c_ni: #if trajectory goes haywire, dont plot it.
+            #     bad_count+=1
+            #     dont_plot=True
+            #     break
+
+        if dont_plot==False:
+            plt.plot(xtr, ytr)
+
+        # if bad flag is True then append None to the list. These nones are counted later
+        if bad_flag == False:  
+            sars_traj_list.append(sars_traj) 
+            traj_list.append((xtr,ytr))
+            t_list.append(t)
+            G_list.append(G)
+        #ADDED for trajactory comparison
+        else:
+            state_tr_list.append(None) 
+            traj_list.append(None)
+            t_list.append(None)
+            G_list.append(None)
+
+
+    if fname != None:
+        plt.savefig(join(fpath,fname),bbox_inches = "tight", dpi=200)
+        plt.cla()
+        plt.close(fig)
+        print("*** pickling traj_list ***")
+        picklePolicy(traj_list, join(fpath,fname))
+        picklePolicy(sars_traj_list,join(fpath,'sars_traj_'+fname) )
         print("*** pickled ***")
 
     return t_list, G_list, bad_count

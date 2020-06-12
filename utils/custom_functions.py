@@ -613,7 +613,9 @@ def get_rzn_ids_for_training_and_testing(dt_size, num_rzns):
     id_list = random.sample(range(0, num_rzns), num_rzns)
     train_id_list = id_list[0:dt_size]
     test_id_list = id_list[dt_size:num_rzns]
-    return set(train_id_list), set(test_id_list)
+    train_id_list.sort()
+    test_id_list.sort()
+    return train_id_list, test_id_list,  set(train_id_list), set(test_id_list)
 
 
 def print_sorted_Qs_kvs(g, Q, state):

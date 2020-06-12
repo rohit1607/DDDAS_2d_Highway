@@ -1,5 +1,5 @@
 from QL.Build_Q_from_Trajs import Learn_policy_from_data
-from utils.plot_functions import plot_max_delQs, plot_exact_trajectory_set, plot_max_Qvalues, plot_learned_policy
+from utils.plot_functions import plot_max_delQs, plot_exact_trajectory_set, plot_max_Qvalues, plot_learned_policy,plot_and_return_exact_trajectory_set_train_data
 from QL.Q_Learning import Q_learning_Iters
 from utils.custom_functions import initialise_policy, initialise_Q_N, initialise_guided_Q_N, initialise_policy_from_initQ, createFolder, calc_mean_and_std, append_summary_to_summaryFile,get_rzn_ids_for_training_and_testing, calc_mean_and_std_train_test, print_sorted_Qs_kvs, picklePolicy
 import time
@@ -74,7 +74,7 @@ def run_QL(setup_grid_params, QL_params, QL_path, exp_num):
                         print("num_actions= ", num_actions)
 
                         # get respective indices fo trajectories for training and testing:
-                        train_id_list, test_id_list = get_rzn_ids_for_training_and_testing(dt_size, num_rzns)
+                        train_id_list, test_id_list, train_id_set, test_id_set = get_rzn_ids_for_training_and_testing(dt_size, num_rzns)
 
                         # Reset Variables and environment
                         # (Re)initialise Q and N based on with_guidance paramter
@@ -92,7 +92,7 @@ def run_QL(setup_grid_params, QL_params, QL_path, exp_num):
                         #Learn Policy From Trajectory Data
                         #if trajectory data is given, learn from it. otherwise just initilise a policy and go to refinemnet step. The latter becomes model-free QL
                         if dt_size != 0:
-                            Q, policy, max_delQ_list_1 = Learn_policy_from_data(paths, g, Q, N, Vx_rzns, Vy_rzns, train_id_list, N_inc, num_actions =num_actions, ALPHA=ALPHA, method = method, num_passes = num_passes)
+                            Q, _, policy, max_delQ_list_1 = Learn_policy_from_data(paths, g, Q, N, Vx_rzns, Vy_rzns, train_id_list, N_inc, num_actions =num_actions, ALPHA=ALPHA, method = method, num_passes = num_passes)
                             print("Learned Policy from data")
 
                             #Save policy
@@ -100,7 +100,7 @@ def run_QL(setup_grid_params, QL_params, QL_path, exp_num):
                             picklePolicy(policy, Policy_path)
                             print("Policy written to file")
 
-                            plot_max_Qvalues(Q, policy, X, Y, fpath = dir_path, fname = 'max_Qvalues', showfig = True)
+                            # plot_max_Qvalues(Q, policy, X, Y, fpath = dir_path, fname = 'max_Qvalues', showfig = True)
                             print("Plotted max Qvals")
 
                             #Plot Policy
@@ -126,7 +126,7 @@ def run_QL(setup_grid_params, QL_params, QL_path, exp_num):
 
 
                         # Times and Trajectories based on data and/or guidance
-                        t_list1, G0_list1, bad_count1 = plot_exact_trajectory_set(g, policy, X, Y, Vx_rzns, Vy_rzns, train_id_list, test_id_list,
+                        t_list1, G0_list1, bad_count1 = plot_exact_trajectory_set(g, policy, X, Y, Vx_rzns, Vy_rzns, train_id_set, test_id_set,
                                                                             fpath = dir_path, fname = 'Trajectories_before_exp')
                         print("plotted exacte trajectory set")
 
@@ -146,9 +146,15 @@ def run_QL(setup_grid_params, QL_params, QL_path, exp_num):
 
                         #plots after Experince
                         plot_max_delQs(max_delQ_list_2, filename= dir_path + 'delQplot2' )
-                        t_list2, G0_list2, bad_count2 = plot_exact_trajectory_set(g, policy, X, Y, Vx_rzns, Vy_rzns, train_id_list, test_id_list,
+                        t_list2, G0_list2, bad_count2 = plot_exact_trajectory_set(g, policy, X, Y, Vx_rzns, Vy_rzns, train_id_set, test_id_set,
                                                                     fpath = dir_path, fname =  'Trajectories_after_exp')
+                        t_list3, G0_list3, bad_count3 = plot_and_return_exact_trajectory_set_train_data(g, policy, X, Y, Vx_rzns, Vy_rzns, train_id_list,
+                                                                    fpath = dir_path, fname =  'Trained_Trajectories_after_exp')
                         print("plotted max delQs and exact traj set AFTER REFINEMENT")
+
+                        picklePolicy(Q, dir_path + 'Q2')
+                        picklePolicy(N, dir_path + 'N2')
+
 
                         print_sorted_Qs_kvs(g, Q, query_state)
 
@@ -159,11 +165,11 @@ def run_QL(setup_grid_params, QL_params, QL_path, exp_num):
                         # avg_time2 = np.mean(t_list2)
                         # std_time2 = np.std(t_list2)
                         # avg_G02 = np.mean(G0_list2)
-                        avg_time1, std_time1, cnt1 , none_cnt1, none_cnt_perc1 = calc_mean_and_std_train_test(t_list1, train_id_list, test_id_list)
-                        avg_G01, _, _, _ ,_= calc_mean_and_std_train_test(G0_list1, train_id_list, test_id_list)
+                        avg_time1, std_time1, cnt1 , none_cnt1, none_cnt_perc1 = calc_mean_and_std_train_test(t_list1, train_id_set, test_id_set)
+                        avg_G01, _, _, _ ,_= calc_mean_and_std_train_test(G0_list1, train_id_set, test_id_set)
                         
-                        avg_time2, std_time2, cnt2 , none_cnt2, none_cnt_perc2 = calc_mean_and_std_train_test(t_list2, train_id_list, test_id_list)
-                        avg_G02, _, _, _, _ = calc_mean_and_std_train_test(G0_list2,train_id_list, test_id_list)
+                        avg_time2, std_time2, cnt2 , none_cnt2, none_cnt_perc2 = calc_mean_and_std_train_test(t_list2, train_id_set, test_id_set)
+                        avg_G02, _, _, _, _ = calc_mean_and_std_train_test(G0_list2,train_id_set, test_id_set)
 
                         
                         overall_bad_count1 = 'dummy_init'
@@ -176,8 +182,8 @@ def run_QL(setup_grid_params, QL_params, QL_path, exp_num):
                         case_runtime = round( (t_end_case - t_start_case) / 60, 2 ) #mins
 
                         #Print results to file
-                        picklePolicy(train_id_list, dir_path +'train_id_list_set')
-                        picklePolicy(test_id_list, dir_path +'test_id_list_set')
+                        picklePolicy(train_id_list, dir_path +'train_id_list')
+                        picklePolicy(test_id_list, dir_path +'test_id_list')
 
 
                         str_Results1 = ['avg_time1','std_time1', 'overall_bad_count1', 'avg_G01']
@@ -235,7 +241,7 @@ def run_QL(setup_grid_params, QL_params, QL_path, exp_num):
                         output_parameters_all_cases.append(output_paramaters_ith_case) 
 
                         append_summary_to_summaryFile( join(ROOT_DIR, 'Experiments/Exp_summary_QL.csv'),  output_paramaters_ith_case)
-
+                        picklePolicy(output_paramaters_ith_case, join(dir_path, 'output_paramaters') )
                         RUN_QL_elpased_time = round((time.time() - t_start_RUN_QL)/60, 2)
                         #Terminal Print
                         print('Case_runtime= ', case_runtime)
